@@ -277,7 +277,7 @@ const MovieRequestModal = ({
         }
         secondaryButtonType="danger"
         cancelText={intl.formatMessage(globalMessages.close)}
-        backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data?.backdropPath}`}
+        backdrop={data?.backdropPath}
       >
         {isOwner
           ? intl.formatMessage(messages.pendingapproval)
@@ -333,7 +333,7 @@ const MovieRequestModal = ({
             )
       }
       okButtonType={'primary'}
-      backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data?.backdropPath}`}
+      backdrop={data?.backdropPath}
     >
       {hasAutoApprove && !quota?.movie.restricted && (
         <div className="mt-6">
