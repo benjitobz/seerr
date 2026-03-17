@@ -13,24 +13,28 @@ const SeriesPage: NextPage<SeriesPageProps> = ({ series }) => {
 export const getServerSideProps: GetServerSideProps<SeriesPageProps> = async (
   ctx
 ) => {
-  const res = await fetch(
-    `http://localhost:${process.env.PORT || 5055}/api/v1/series/${
-      ctx.query.seriesId
-    }`,
-    {
-      headers: ctx.req?.headers?.cookie
-        ? { cookie: ctx.req.headers.cookie }
-        : undefined,
-    }
-  );
-  if (!res.ok) throw new Error();
-  const series: Series = await res.json();
+  try {
+    const res = await fetch(
+      `http://localhost:${process.env.PORT || 5055}/api/v1/series/${
+        ctx.query.seriesId
+      }`,
+      {
+        headers: ctx.req?.headers?.cookie
+          ? { cookie: ctx.req.headers.cookie }
+          : undefined,
+      }
+    );
+    if (!res.ok) throw new Error();
+    const series: Series = await res.json();
 
-  return {
-    props: {
-      series,
-    },
-  };
+    return {
+      props: {
+        series,
+      },
+    };
+  } catch {
+    return { props: {} };
+  }
 };
 
 export default SeriesPage;

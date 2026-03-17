@@ -97,6 +97,13 @@ const ApiQuerySchema = QueryFilterOptions.omit({
 });
 
 discoverRoutes.get('/books', async (req, res, next) => {
+  if (!getSettings().main.hardcoverapikey) {
+    return next({
+      status: 503,
+      message: 'Hardcover API key is not configured.',
+    });
+  }
+
   const hardcover = new Hardcover();
 
   try {
@@ -122,7 +129,8 @@ discoverRoutes.get('/books', async (req, res, next) => {
         mapBookResult(
           result,
           media.find(
-            (req) => req.tmdbId === result.id && req.mediaType === MediaType.BOOK
+            (req) =>
+              req.tmdbId === result.id && req.mediaType === MediaType.BOOK
           )
         )
       ),
