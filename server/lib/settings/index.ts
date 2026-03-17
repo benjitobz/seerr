@@ -103,6 +103,11 @@ export interface SonarrSettings extends DVRSettings {
   monitorNewItems: 'all' | 'none';
 }
 
+export interface ReadarrSettings extends DVRSettings {
+  activeMetadataProfileId: number;
+  activeMetadataProfileName: string;
+}
+
 interface Quota {
   quotaLimit?: number;
   quotaDays?: number;
@@ -131,6 +136,7 @@ export interface ProxySettings {
 
 export interface MainSettings {
   apiKey: string;
+  hardcoverapikey: string;
   applicationTitle: string;
   applicationUrl: string;
   cacheImages: boolean;
@@ -138,6 +144,7 @@ export interface MainSettings {
   defaultQuotas: {
     movie: Quota;
     tv: Quota;
+    book: Quota;
   };
   hideAvailable: boolean;
   hideBlocklisted: boolean;
@@ -197,6 +204,7 @@ interface FullPublicSettings extends PublicSettings {
   mediaServerLogin: boolean;
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
+  bookAudioEnabled: boolean;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;
@@ -360,6 +368,7 @@ export type JobId =
   | 'plex-refresh-token'
   | 'radarr-scan'
   | 'sonarr-scan'
+  | 'readarr-scan'
   | 'download-sync'
   | 'download-sync-reset'
   | 'jellyfin-recently-added-scan'
@@ -379,6 +388,7 @@ export interface AllSettings {
   tautulli: TautulliSettings;
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
+  readarr: ReadarrSettings[];
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -403,6 +413,7 @@ class Settings {
       vapidPublic: '',
       main: {
         apiKey: '',
+        hardcoverapikey: '',
         applicationTitle: 'Seerr',
         applicationUrl: '',
         cacheImages: false,
@@ -410,6 +421,7 @@ class Settings {
         defaultQuotas: {
           movie: {},
           tv: {},
+          book: {},
         },
         hideAvailable: false,
         hideBlocklisted: false,
@@ -455,6 +467,7 @@ class Settings {
       },
       radarr: [],
       sonarr: [],
+      readarr: [],
       public: {
         initialized: false,
       },
@@ -584,6 +597,9 @@ class Settings {
         'sonarr-scan': {
           schedule: '0 30 4 * * *',
         },
+        'readarr-scan': {
+          schedule: '0 30 4 * * *',
+        },
         'availability-sync': {
           schedule: '0 0 5 * * *',
         },
@@ -693,6 +709,14 @@ class Settings {
     this.data.sonarr = data;
   }
 
+  get readarr(): ReadarrSettings[] {
+    return this.data.readarr;
+  }
+
+  set readarr(data: ReadarrSettings[]) {
+    this.data.readarr = data;
+  }
+
   get public(): PublicSettings {
     return this.data.public;
   }
@@ -717,6 +741,9 @@ class Settings {
       ),
       series4kEnabled: this.data.sonarr.some(
         (sonarr) => sonarr.is4k && sonarr.isDefault
+      ),
+      bookAudioEnabled: this.data.readarr.some(
+        (readarr) => readarr.is4k && readarr.isDefault
       ),
       discoverRegion: this.data.main.discoverRegion,
       streamingRegion: this.data.main.streamingRegion,

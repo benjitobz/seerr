@@ -131,6 +131,9 @@ class ImageProxy {
   private axios: AxiosInstance;
   private cacheVersion;
   private key;
+  private transform?: (
+    buffer: Buffer
+  ) => Promise<{ buffer: Buffer; extension: string }>;
 
   constructor(
     key: string,
@@ -139,10 +142,14 @@ class ImageProxy {
       cacheVersion?: number;
       rateLimitOptions?: rateLimitOptions;
       headers?: Record<string, string>;
+      transform?: (
+        buffer: Buffer
+      ) => Promise<{ buffer: Buffer; extension: string }>;
     } = {}
   ) {
     this.cacheVersion = options.cacheVersion ?? 1;
     this.key = key;
+    this.transform = options.transform;
     this.axios = axios.create({
       baseURL: baseUrl,
       headers: options.headers,
@@ -173,6 +180,11 @@ class ImageProxy {
         }
       }
 
+      // If there's a transform, serve the raw image now and optimize in background
+      if (this.transform && newImage.meta.cacheMiss) {
+        this.optimizeAndCache(newImage, cacheKey);
+      }
+
       return newImage;
     }
 
@@ -182,6 +194,33 @@ class ImageProxy {
     }
 
     return imageResponse;
+  }
+
+  private async optimizeAndCache(
+    image: ImageResponse,
+    cacheKey: string
+  ): Promise<void> {
+    if (!this.transform) return;
+
+    try {
+      const { buffer, extension } = await this.transform(image.imageBuffer);
+      const directory = join(this.getCacheDirectory(), cacheKey);
+      const expireAt = Date.now() + image.meta.curRevalidate * 1000;
+
+      await this.writeToCacheDir(
+        directory,
+        extension,
+        image.meta.curRevalidate,
+        expireAt,
+        buffer,
+        image.meta.etag
+      );
+    } catch (e) {
+      logger.debug('Failed to optimize image in background.', {
+        label: 'Image Cache',
+        errorMessage: e.message,
+      });
+    }
   }
 
   public async clearCachedImage(path: string) {
@@ -276,7 +315,7 @@ class ImageProxy {
         (response.headers['cache-control'] ?? '0').split('=')[1]
       );
 
-      if (!maxAge) maxAge = 86400;
+      if (!maxAge) maxAge = 604800;
       const expireAt = Date.now() + maxAge * 1000;
       const etag = (response.headers.etag ?? '').replace(/"/g, '');
 
