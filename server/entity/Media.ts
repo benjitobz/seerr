@@ -335,7 +335,7 @@ class Media {
     }
 
     if (this.mediaType === MediaType.BOOK) {
-      if (this.serviceId !== null && this.externalServiceSlug !== null) {
+      if (this.serviceId !== null && this.externalServiceId !== null) {
         const settings = getSettings();
         const server = settings.readarr.find(
           (readarr) => readarr.id === this.serviceId
@@ -343,12 +343,12 @@ class Media {
 
         if (server) {
           this.serviceUrl = server.externalUrl
-            ? `${server.externalUrl}/book/${this.externalServiceSlug}`
-            : ReadarrAPI.buildUrl(server, `/book/${this.externalServiceSlug}`);
+            ? `${server.externalUrl}/book/${this.externalServiceId}`
+            : ReadarrAPI.buildUrl(server, `/book/${this.externalServiceId}`);
         }
       }
 
-      if (this.serviceId4k !== null && this.externalServiceSlug4k !== null) {
+      if (this.serviceId4k !== null && this.externalServiceId4k !== null) {
         const settings = getSettings();
         const server = settings.readarr.find(
           (readarr) => readarr.id === this.serviceId4k
@@ -356,11 +356,8 @@ class Media {
 
         if (server) {
           this.serviceUrl4k = server.externalUrl
-            ? `${server.externalUrl}/book/${this.externalServiceSlug4k}`
-            : ReadarrAPI.buildUrl(
-                server,
-                `/book/${this.externalServiceSlug4k}`
-              );
+            ? `${server.externalUrl}/book/${this.externalServiceId4k}`
+            : ReadarrAPI.buildUrl(server, `/book/${this.externalServiceId4k}`);
         }
       }
     }
