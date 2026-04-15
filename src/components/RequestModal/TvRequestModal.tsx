@@ -198,7 +198,7 @@ const TvRequestModal = ({
         mediaId: data?.id,
         tvdbId: tvdbId ?? data?.externalIds.tvdbId,
         mediaType: 'tv',
-        is4k: is4k,
+        is4k,
         seasons: settings.currentSettings.partialRequestsEnabled
           ? selectedSeasons.sort((a, b) => a - b)
           : getAllSeasons().filter(
@@ -386,7 +386,7 @@ const TvRequestModal = ({
       )}
       modalSubTitle={data.name}
       tmdbId={tmdbId}
-      backdrop={data?.backdropPath}
+      backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data?.backdropPath}`}
     />
   ) : (
     <Modal
@@ -460,7 +460,7 @@ const TvRequestModal = ({
             ? intl.formatMessage(globalMessages.back)
             : intl.formatMessage(globalMessages.cancel)
       }
-      backdrop={data?.backdropPath}
+      backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data?.backdropPath}`}
     >
       {editRequest
         ? isOwner
