@@ -305,11 +305,11 @@ const TitleCard = ({
   const showRequestButton = hasPermission(
     [
       Permission.REQUEST,
-      mediaType === 'movie' ||
-      mediaType === 'collection' ||
       mediaType === 'book'
-        ? Permission.REQUEST_MOVIE
-        : Permission.REQUEST_TV,
+        ? Permission.REQUEST_BOOK
+        : mediaType === 'movie' || mediaType === 'collection'
+          ? Permission.REQUEST_MOVIE
+          : Permission.REQUEST_TV,
     ],
     { type: 'or' }
   );
