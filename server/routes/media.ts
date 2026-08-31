@@ -286,18 +286,18 @@ mediaRoutes.delete(
       const serviceType = is4k ? (isBook ? 'Audiobook' : '4K ') : '';
 
       if (!serviceSettings) {
-        logger.warn(
-          `There is no default ${
-            serviceType + serviceName
-          }/ server configured. Did you set any of your ${
-            serviceType + serviceName
-          } servers as default?`,
+const arrName = serviceType + serviceName;
+        logger.info(
+          `There is no default ${arrName} server configured. Did you set any of your ${arrName} servers as default?`,
           {
             label: 'Media Request',
             mediaId: media.id,
           }
         );
-        return;
+        return next({
+          status: 409,
+          message: `No ${arrName} server configured to delete media files`,
+        });
       }
 
       let service;
@@ -330,15 +330,27 @@ mediaRoutes.delete(
           throw new Error('TVDB ID not found');
         }
         await (service as SonarrAPI).removeSeries(tvdbId);
+
+        for (const season of media.seasons) {
+          season[is4k ? 'status4k' : 'status'] = MediaStatus.DELETED;
+        }
       }
+
+      media[is4k ? 'status4k' : 'status'] = MediaStatus.DELETED;
+      media.resetServiceData(is4k);
+      await mediaRepository.save(media);
 
       return res.status(204).send();
     } catch (e) {
-      logger.error('Something went wrong fetching media in delete request', {
+      if (e instanceof EntityNotFoundError) {
+        return next({ status: 404, message: 'Media not found' });
+      }
+      logger.error('Something went wrong deleting media file', {
         label: 'Media',
+        mediaId: req.params.id,
         message: e.message,
       });
-      next({ status: 404, message: 'Media not found' });
+      next({ status: 500, message: 'Failed to delete media file' });
     }
   }
 );
