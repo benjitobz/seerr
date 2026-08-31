@@ -59,7 +59,7 @@ class Hardcover extends ExternalAPI {
       {
         nodeCache: cacheManager.getCache('hardcover').data,
         rateLimit: {
-          maxRPS: 5,
+          maxRPS: 1,
           maxRequests: 50,
         },
         headers: {
