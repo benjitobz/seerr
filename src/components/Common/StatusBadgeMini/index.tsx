@@ -5,6 +5,7 @@ import {
   ClockIcon,
   EyeSlashIcon,
   MinusSmallIcon,
+  SpeakerWaveIcon,
   TrashIcon,
 } from '@heroicons/react/24/solid';
 import { MediaStatus } from '@server/constants/media';
@@ -12,6 +13,7 @@ import { MediaStatus } from '@server/constants/media';
 interface StatusBadgeMiniProps {
   status: MediaStatus;
   is4k?: boolean;
+  audiobook?: boolean;
   inProgress?: boolean;
   // Should the badge shrink on mobile to a smaller size? (TitleCard)
   shrink?: boolean;
@@ -20,6 +22,7 @@ interface StatusBadgeMiniProps {
 const StatusBadgeMini = ({
   status,
   is4k = false,
+  audiobook = false,
   inProgress = false,
   shrink = false,
 }: StatusBadgeMiniProps) => {
@@ -78,6 +81,11 @@ const StatusBadgeMini = ({
     >
       <div className={badgeStyle.join(' ')}>{indicatorIcon}</div>
       {is4k && <span className="pl-1 pr-2 text-gray-200">4K</span>}
+      {audiobook && (
+        <span className="flex items-center pl-1 pr-1.5 text-gray-200">
+          <SpeakerWaveIcon className="h-3 w-3" />
+        </span>
+      )}
     </div>
   );
 };
