@@ -8,6 +8,7 @@ import RequestModal from '@app/components/RequestModal';
 import ErrorCard from '@app/components/TitleCard/ErrorCard';
 import Placeholder from '@app/components/TitleCard/Placeholder';
 import { useIsTouch } from '@app/hooks/useIsTouch';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -39,6 +40,7 @@ interface TitleCardProps {
   userScore?: number;
   mediaType: MediaType;
   status?: MediaStatus;
+  status4k?: MediaStatus;
   canExpand?: boolean;
   inProgress?: boolean;
   position?: number;
@@ -63,6 +65,7 @@ const TitleCard = ({
   year,
   title,
   status,
+  status4k,
   mediaType,
   isAddedToWatchlist = false,
   inProgress = false,
@@ -72,6 +75,7 @@ const TitleCard = ({
 }: TitleCardProps) => {
   const isTouch = useIsTouch();
   const intl = useIntl();
+  const settings = useSettings();
   const { user, hasPermission } = useUser();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
@@ -318,6 +322,18 @@ const TitleCard = ({
     type: 'or',
   });
 
+  const showAudiobookStatus =
+    mediaType === 'book' &&
+    settings.currentSettings.bookAudioEnabled &&
+    hasPermission(
+      [
+        Permission.MANAGE_REQUESTS,
+        Permission.REQUEST_4K,
+        Permission.REQUEST_AUDIO_BOOK,
+      ],
+      { type: 'or' }
+    );
+
   return (
     <div
       className={canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'}
@@ -490,15 +506,27 @@ const TitleCard = ({
                   </Button>
                 </Tooltip>
               )}
-            {currentStatus && currentStatus !== MediaStatus.UNKNOWN && (
+            {((currentStatus && currentStatus !== MediaStatus.UNKNOWN) ||
+              (showAudiobookStatus &&
+                status4k &&
+                status4k !== MediaStatus.UNKNOWN)) && (
               <div className="flex flex-col items-center gap-1">
-                <div className="pointer-events-none z-40 flex">
-                  <StatusBadgeMini
-                    status={currentStatus}
-                    inProgress={inProgress}
-                    shrink
-                  />
-                </div>
+                {currentStatus && currentStatus !== MediaStatus.UNKNOWN && (
+                  <div className="pointer-events-none z-40 flex">
+                    <StatusBadgeMini
+                      status={currentStatus}
+                      inProgress={inProgress}
+                      shrink
+                    />
+                  </div>
+                )}
+                {showAudiobookStatus &&
+                  status4k &&
+                  status4k !== MediaStatus.UNKNOWN && (
+                    <div className="pointer-events-none z-40 flex">
+                      <StatusBadgeMini status={status4k} audiobook shrink />
+                    </div>
+                  )}
               </div>
             )}
           </div>
