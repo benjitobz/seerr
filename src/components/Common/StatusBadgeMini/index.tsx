@@ -29,9 +29,11 @@ const StatusBadgeMini = ({
   inProgress = false,
   shrink = false,
 }: StatusBadgeMiniProps) => {
+  const hasFormatIcon = audiobook || book;
+
   const badgeStyle = [
     `rounded-full shadow-md ${
-      audiobook || book
+      hasFormatIcon
         ? `flex items-center gap-0.5 ${
             shrink ? 'h-4 border px-1 sm:h-5' : 'ring-1 px-1.5 py-0.5'
           }`
@@ -46,34 +48,50 @@ const StatusBadgeMini = ({
   switch (status) {
     case MediaStatus.PROCESSING:
       badgeStyle.push(
-        'bg-indigo-500/80 border-indigo-400 ring-indigo-400 text-indigo-100'
+        hasFormatIcon
+          ? 'bg-white border-indigo-500 ring-indigo-500 text-indigo-600'
+          : 'bg-indigo-500/80 border-indigo-400 ring-indigo-400 text-indigo-100'
       );
       indicatorIcon = <ClockIcon />;
       break;
     case MediaStatus.AVAILABLE:
       badgeStyle.push(
-        'bg-green-500/80 border-green-400 ring-green-400 text-green-100'
+        hasFormatIcon
+          ? 'bg-white border-green-500 ring-green-500 text-green-600'
+          : 'bg-green-500/80 border-green-400 ring-green-400 text-green-100'
       );
       indicatorIcon = <CheckCircleIcon />;
       break;
     case MediaStatus.PENDING:
       badgeStyle.push(
-        'bg-yellow-500/80 border-yellow-400 ring-yellow-400 text-yellow-100'
+        hasFormatIcon
+          ? 'bg-white border-yellow-500 ring-yellow-500 text-yellow-600'
+          : 'bg-yellow-500/80 border-yellow-400 ring-yellow-400 text-yellow-100'
       );
       indicatorIcon = <BellIcon />;
       break;
     case MediaStatus.BLOCKLISTED:
-      badgeStyle.push('bg-red-500/80 border-white ring-white text-white');
+      badgeStyle.push(
+        hasFormatIcon
+          ? 'bg-white border-red-500 ring-red-500 text-red-600'
+          : 'bg-red-500/80 border-white ring-white text-white'
+      );
       indicatorIcon = <EyeSlashIcon />;
       break;
     case MediaStatus.PARTIALLY_AVAILABLE:
       badgeStyle.push(
-        'bg-green-500/80 border-green-400 ring-green-400 text-green-100'
+        hasFormatIcon
+          ? 'bg-white border-green-500 ring-green-500 text-green-600'
+          : 'bg-green-500/80 border-green-400 ring-green-400 text-green-100'
       );
       indicatorIcon = <MinusSmallIcon />;
       break;
     case MediaStatus.DELETED:
-      badgeStyle.push('bg-red-500/80 border-red-400 ring-red-400 text-red-100');
+      badgeStyle.push(
+        hasFormatIcon
+          ? 'bg-white border-red-500 ring-red-500 text-red-600'
+          : 'bg-red-500/80 border-red-400 ring-red-400 text-red-100'
+      );
       indicatorIcon = <TrashIcon />;
       break;
   }
