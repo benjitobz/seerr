@@ -242,6 +242,12 @@ class Hardcover extends ExternalAPI {
       }
       if (releaseDateLte && datePattern.test(releaseDateLte)) {
         conditions.push(`{release_date: {_lte: "${releaseDateLte}"}}`);
+      } else if (sortBy === 'release_date.desc') {
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() + 1);
+        conditions.push(
+          `{release_date: {_lte: "${maxDate.toISOString().split('T')[0]}"}}`
+        );
       }
 
       const orderMap: Record<string, string> = {
