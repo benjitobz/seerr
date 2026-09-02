@@ -35,7 +35,7 @@ const StatusBadgeMini = ({
     `rounded-full shadow-md ${
       hasFormatIcon
         ? `flex items-center gap-0.5 ${
-            shrink ? 'h-4 border px-0.5 sm:h-5' : 'ring-1 px-1 py-0.5'
+            shrink ? 'h-4 border p-0 pr-1 sm:h-5' : 'ring-1 p-0.5 pr-1.5'
           }`
         : shrink
           ? 'w-4 sm:w-5 border p-0'
