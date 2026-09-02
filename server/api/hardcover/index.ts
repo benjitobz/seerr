@@ -223,42 +223,50 @@ class Hardcover extends ExternalAPI {
       const limit = 20;
       const offset = (page - 1) * limit;
 
-      const conditions: Record<string, unknown>[] = [
-        { book_status_id: { _eq: '1' } },
-        { compilation: { _eq: false } },
+      const slugPattern = /^[a-z0-9-]+$/;
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+      const conditions: string[] = [
+        '{book_status_id: {_eq: "1"}}',
+        '{compilation: {_eq: false}}',
       ];
-      (genres ?? []).forEach((genre) => {
-        conditions.push({
-          cached_tags: { _contains: { Genre: [{ tagSlug: genre }] } },
+      (genres ?? [])
+        .filter((genre) => slugPattern.test(genre))
+        .forEach((genre) => {
+          conditions.push(
+            `{cached_tags: {_contains: {Genre: [{tagSlug: "${genre}"}]}}}`
+          );
         });
-      });
-      if (releaseDateGte) {
-        conditions.push({ release_date: { _gte: releaseDateGte } });
+      if (releaseDateGte && datePattern.test(releaseDateGte)) {
+        conditions.push(`{release_date: {_gte: "${releaseDateGte}"}}`);
       }
-      if (releaseDateLte) {
-        conditions.push({ release_date: { _lte: releaseDateLte } });
+      if (releaseDateLte && datePattern.test(releaseDateLte)) {
+        conditions.push(`{release_date: {_lte: "${releaseDateLte}"}}`);
       }
 
-      const orderMap: Record<string, Record<string, string>> = {
-        'popularity.asc': { users_count: 'asc' },
-        'popularity.desc': { users_count: 'desc' },
-        'release_date.asc': { release_date: 'asc' },
-        'release_date.desc': { release_date: 'desc' },
-        'original_title.asc': { title: 'asc' },
-        'original_title.desc': { title: 'desc' },
+      const orderMap: Record<string, string> = {
+        'popularity.asc': '{users_count: asc}',
+        'popularity.desc': '{users_count: desc}',
+        'release_date.asc': '{release_date: asc}',
+        'release_date.desc': '{release_date: desc}',
+        'original_title.asc': '{title: asc}',
+        'original_title.desc': '{title: desc}',
       };
 
       const data = await this.post<BookResponse>('/', {
         query: `
-          query DiscoverBooksFiltered($where: books_bool_exp!, $order: [books_order_by!], $limit: Int!, $offset: Int!) {
-            books(where: $where, order_by: $order, limit: $limit, offset: $offset) {
+          query DiscoverBooksFiltered($limit: Int!, $offset: Int!) {
+            books(
+              where: {_and: [${conditions.join(', ')}]}
+              order_by: ${orderMap[sortBy ?? ''] ?? '{users_count: desc}'}
+              limit: $limit
+              offset: $offset
+            ) {
               ${BOOK_RESULT}
             }
           }
         `,
         variables: {
-          where: { _and: conditions },
-          order: [orderMap[sortBy ?? ''] ?? { users_count: 'desc' }],
           limit,
           offset,
         },
