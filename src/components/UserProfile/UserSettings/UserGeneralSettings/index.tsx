@@ -58,6 +58,7 @@ const messages = defineMessages(
     streamingRegionTip: 'Show streaming sites by regional availability',
     movierequestlimit: 'Movie Request Limit',
     seriesrequestlimit: 'Series Request Limit',
+    bookrequestlimit: 'Book Request Limit',
     booksrequestlimit: 'Books Request Limit',
     enableOverride: 'Override Global Limit',
     applanguage: 'Display Language',
@@ -513,7 +514,7 @@ const UserGeneralSettings = () => {
                     <div className="form-row">
                       <label htmlFor="bookQuotaLimit" className="text-label">
                         <span>
-                          {intl.formatMessage(messages.seriesrequestlimit)}
+                          {intl.formatMessage(messages.bookrequestlimit)}
                         </span>
                       </label>
                       <div className="form-input-area">
