@@ -23,6 +23,7 @@ import orderBy from 'lodash/orderBy';
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import type { MultiValue, SingleValue } from 'react-select';
+import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import useSWR from 'swr';
 
@@ -634,3 +635,53 @@ export const UserSelector = ({
 };
 
 export { default as USCertificationSelector } from './USCertificationSelector';
+
+type BookGenreVal = {
+  label: string;
+  value: string;
+};
+
+export const bookGenreOptions: BookGenreVal[] = [
+  { label: 'Biography', value: 'biography' },
+  { label: 'Classics', value: 'classics' },
+  { label: 'Fantasy', value: 'fantasy' },
+  { label: 'Historical Fiction', value: 'historical-fiction' },
+  { label: 'Horror', value: 'horror' },
+  { label: 'Mystery', value: 'mystery' },
+  { label: 'Nonfiction', value: 'nonfiction' },
+  { label: 'Romance', value: 'romance' },
+  { label: 'Science Fiction', value: 'science-fiction' },
+  { label: 'Thriller', value: 'thriller' },
+  { label: 'Young Adult', value: 'young-adult' },
+];
+
+type BookGenreSelectorProps = {
+  defaultValue?: string;
+  onChange: (value: MultiValue<BookGenreVal> | null) => void;
+};
+
+export const BookGenreSelector = ({
+  defaultValue,
+  onChange,
+}: BookGenreSelectorProps) => {
+  const intl = useIntl();
+
+  const defaultDataValue = defaultValue
+    ? bookGenreOptions.filter((option) =>
+        defaultValue.split(',').includes(option.value)
+      )
+    : null;
+
+  return (
+    <Select<BookGenreVal, true>
+      key={`book-genre-select-${defaultValue}`}
+      className="react-select-container"
+      classNamePrefix="react-select"
+      defaultValue={defaultDataValue}
+      options={bookGenreOptions}
+      isMulti
+      placeholder={intl.formatMessage(messages.searchGenres)}
+      onChange={(value) => onChange(value)}
+    />
+  );
+};

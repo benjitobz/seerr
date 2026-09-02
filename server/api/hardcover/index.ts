@@ -28,6 +28,10 @@ import type {
 } from './interfaces';
 
 interface DiscoverBookOptions {
+  genres?: string[];
+  releaseDateGte?: string;
+  releaseDateLte?: string;
+  sortBy?: string;
   page?: number;
 }
 
@@ -190,17 +194,81 @@ class Hardcover extends ExternalAPI {
 
   public getDiscoverBooks = async ({
     page = 1,
+    genres,
+    releaseDateGte,
+    releaseDateLte,
+    sortBy,
   }: DiscoverBookOptions = {}): Promise<BookResponse> => {
     try {
-      const offset = Math.floor((page - 1) * 50);
+      const hasFilters = !!(
+        genres?.length ||
+        releaseDateGte ||
+        releaseDateLte ||
+        (sortBy && sortBy !== 'popularity.desc')
+      );
 
-      const ids = await this.getTrendingBooks(offset);
+      if (!hasFilters) {
+        const offset = Math.floor((page - 1) * 50);
+
+        const ids = await this.getTrendingBooks(offset);
+
+        return {
+          data: await this.getBooks(ids),
+          page: page,
+          total_results: 10000,
+          total_pages: 200,
+        };
+      }
+
+      const limit = 20;
+      const offset = (page - 1) * limit;
+
+      const conditions: Record<string, unknown>[] = [
+        { book_status_id: { _eq: '1' } },
+        { compilation: { _eq: false } },
+      ];
+      (genres ?? []).forEach((genre) => {
+        conditions.push({
+          cached_tags: { _contains: { Genre: [{ tagSlug: genre }] } },
+        });
+      });
+      if (releaseDateGte) {
+        conditions.push({ release_date: { _gte: releaseDateGte } });
+      }
+      if (releaseDateLte) {
+        conditions.push({ release_date: { _lte: releaseDateLte } });
+      }
+
+      const orderMap: Record<string, Record<string, string>> = {
+        'popularity.asc': { users_count: 'asc' },
+        'popularity.desc': { users_count: 'desc' },
+        'release_date.asc': { release_date: 'asc' },
+        'release_date.desc': { release_date: 'desc' },
+        'original_title.asc': { title: 'asc' },
+        'original_title.desc': { title: 'desc' },
+      };
+
+      const data = await this.post<BookResponse>('/', {
+        query: `
+          query DiscoverBooksFiltered($where: books_bool_exp!, $order: [books_order_by!], $limit: Int!, $offset: Int!) {
+            books(where: $where, order_by: $order, limit: $limit, offset: $offset) {
+              ${BOOK_RESULT}
+            }
+          }
+        `,
+        variables: {
+          where: { _and: conditions },
+          order: [orderMap[sortBy ?? ''] ?? { users_count: 'desc' }],
+          limit,
+          offset,
+        },
+      });
 
       return {
-        data: await this.getBooks(ids),
-        page: page,
-        total_results: 10000,
-        total_pages: 200,
+        data: { books: data.data.books },
+        page,
+        total_results: 1000,
+        total_pages: 50,
       };
     } catch (e) {
       throw new Error(
