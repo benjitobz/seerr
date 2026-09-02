@@ -147,6 +147,58 @@ discoverRoutes.get('/books', async (req, res, next) => {
   }
 });
 
+discoverRoutes.get('/books/genre/:genreSlug', async (req, res, next) => {
+  if (!getSettings().main.hardcoverapikey) {
+    return next({
+      status: 503,
+      message: 'Hardcover API key is not configured.',
+    });
+  }
+
+  const hardcover = new Hardcover();
+
+  try {
+    const query = QueryFilterOptions.parse(req.query);
+    const data = await hardcover.getBooksByGenre({
+      genreSlug: req.params.genreSlug,
+      page: Number(query.page),
+    });
+
+    const media = await Media.getRelatedMedia(
+      req.user,
+      data.data.books.map((result) => ({
+        tmdbId: result.id,
+        mediaType: MediaType.BOOK,
+      }))
+    );
+
+    return res.status(200).json({
+      page: data.page,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+      keywords: undefined,
+      results: data.data.books.map((result) =>
+        mapBookResult(
+          result,
+          media.find(
+            (req) =>
+              req.tmdbId === result.id && req.mediaType === MediaType.BOOK
+          )
+        )
+      ),
+    });
+  } catch (e) {
+    logger.debug('Something went wrong retrieving books by genre', {
+      label: 'API',
+      errorMessage: e.message,
+    });
+    return next({
+      status: 500,
+      message: 'Unable to retrieve books by genre.',
+    });
+  }
+});
+
 discoverRoutes.get('/movies', async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage(req.user);
 
