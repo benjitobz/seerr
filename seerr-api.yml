@@ -6011,46 +6011,6 @@ paths:
                     items:
                       $ref: '#/components/schemas/BookResult'
 
-  /discover/books/genre/{genreSlug}:
-    get:
-      summary: Discover books by genre
-      description: Returns a list of books in a JSON object.
-      tags:
-        - search
-      parameters:
-        - in: path
-          name: genreSlug
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: page
-          schema:
-            type: number
-            example: 1
-            default: 1
-      responses:
-        '200':
-          description: Results
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  page:
-                    type: number
-                    example: 1
-                  totalPages:
-                    type: number
-                    example: 20
-                  totalResults:
-                    type: number
-                    example: 200
-                  results:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/BookResult'
-
   /discover/movies:
     get:
       summary: Discover movies
