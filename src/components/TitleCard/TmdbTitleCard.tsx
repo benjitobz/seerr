@@ -59,7 +59,7 @@ const TmdbTitleCard = ({
       setShowError(false);
       return;
     }
-    const timer = setTimeout(() => setShowError(true), 10000);
+    const timer = setTimeout(() => setShowError(true), 20000);
     return () => clearTimeout(timer);
   }, [error, title]);
 
