@@ -31,7 +31,13 @@ const StatusBadgeMini = ({
 }: StatusBadgeMiniProps) => {
   const badgeStyle = [
     `rounded-full shadow-md ${
-      shrink ? 'w-4 sm:w-5 border p-0' : 'w-5 ring-1 p-0.5'
+      audiobook || book
+        ? `flex items-center gap-0.5 ${
+            shrink ? 'h-4 border px-1 sm:h-5' : 'ring-1 px-1.5 py-0.5'
+          }`
+        : shrink
+          ? 'w-4 sm:w-5 border p-0'
+          : 'w-5 ring-1 p-0.5'
     }`,
   ];
 
@@ -76,24 +82,29 @@ const StatusBadgeMini = ({
     indicatorIcon = <Spinner />;
   }
 
+  const formatIcon = audiobook ? (
+    <SpeakerWaveIcon />
+  ) : book ? (
+    <BookOpenIcon />
+  ) : null;
+
   return (
     <div
       className={`relative inline-flex whitespace-nowrap rounded-full border-gray-700 text-xs font-semibold leading-5 ring-gray-700 ${
         shrink ? '' : 'ring-1'
       }`}
     >
-      <div className={badgeStyle.join(' ')}>{indicatorIcon}</div>
+      <div className={badgeStyle.join(' ')}>
+        {formatIcon ? (
+          <>
+            <span className="h-3 w-3 sm:h-3.5 sm:w-3.5">{indicatorIcon}</span>
+            <span className="h-3 w-3 sm:h-3.5 sm:w-3.5">{formatIcon}</span>
+          </>
+        ) : (
+          indicatorIcon
+        )}
+      </div>
       {is4k && <span className="pl-1 pr-2 text-gray-200">4K</span>}
-      {audiobook && (
-        <span className="flex items-center pl-1 pr-1.5 text-gray-200">
-          <SpeakerWaveIcon className="h-3 w-3" />
-        </span>
-      )}
-      {book && (
-        <span className="flex items-center pl-1 pr-1.5 text-gray-200">
-          <BookOpenIcon className="h-3 w-3" />
-        </span>
-      )}
     </div>
   );
 };
