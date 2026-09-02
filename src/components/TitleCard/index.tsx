@@ -22,7 +22,8 @@ import {
   MinusCircleIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { MediaStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { Watchlist } from '@server/entity/Watchlist';
 import type { MediaType } from '@server/models/Search';
 import axios from 'axios';
@@ -41,6 +42,7 @@ interface TitleCardProps {
   mediaType: MediaType;
   status?: MediaStatus;
   status4k?: MediaStatus;
+  mediaRequests?: MediaRequest[];
   canExpand?: boolean;
   inProgress?: boolean;
   position?: number;
@@ -66,6 +68,7 @@ const TitleCard = ({
   title,
   status,
   status4k,
+  mediaRequests,
   mediaType,
   isAddedToWatchlist = false,
   inProgress = false,
@@ -334,6 +337,37 @@ const TitleCard = ({
       { type: 'or' }
     );
 
+  const hasActiveRequest = (is4k: boolean) =>
+    !!mediaRequests?.some(
+      (request) =>
+        request.is4k === is4k &&
+        request.status !== MediaRequestStatus.DECLINED &&
+        request.status !== MediaRequestStatus.FAILED
+    );
+
+  const isAvailableStatus = (mediaStatus?: MediaStatus) =>
+    mediaStatus === MediaStatus.AVAILABLE ||
+    mediaStatus === MediaStatus.PARTIALLY_AVAILABLE;
+
+  const ebookMissing =
+    mediaType === 'book' &&
+    currentStatus === MediaStatus.PROCESSING &&
+    !hasActiveRequest(false);
+  const audiobookMissing =
+    status4k === MediaStatus.PROCESSING && !hasActiveRequest(true);
+
+  const ebookDisplayStatus =
+    mediaType === 'book' &&
+    showAudiobookStatus &&
+    currentStatus === MediaStatus.AVAILABLE &&
+    !isAvailableStatus(status4k)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : currentStatus;
+  const audiobookDisplayStatus =
+    status4k === MediaStatus.AVAILABLE && !isAvailableStatus(currentStatus)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : status4k;
+
   return (
     <div
       className={canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'}
@@ -511,21 +545,28 @@ const TitleCard = ({
                 status4k &&
                 status4k !== MediaStatus.UNKNOWN)) && (
               <div className="flex flex-col items-center gap-1">
-                {currentStatus && currentStatus !== MediaStatus.UNKNOWN && (
-                  <div className="pointer-events-none z-40 flex">
-                    <StatusBadgeMini
-                      status={currentStatus}
-                      inProgress={inProgress}
-                      book={mediaType === 'book'}
-                      shrink
-                    />
-                  </div>
-                )}
-                {showAudiobookStatus &&
-                  status4k &&
-                  status4k !== MediaStatus.UNKNOWN && (
+                {ebookDisplayStatus &&
+                  ebookDisplayStatus !== MediaStatus.UNKNOWN && (
                     <div className="pointer-events-none z-40 flex">
-                      <StatusBadgeMini status={status4k} audiobook shrink />
+                      <StatusBadgeMini
+                        status={ebookDisplayStatus}
+                        inProgress={inProgress}
+                        book={mediaType === 'book'}
+                        missing={ebookMissing}
+                        shrink
+                      />
+                    </div>
+                  )}
+                {showAudiobookStatus &&
+                  audiobookDisplayStatus &&
+                  audiobookDisplayStatus !== MediaStatus.UNKNOWN && (
+                    <div className="pointer-events-none z-40 flex">
+                      <StatusBadgeMini
+                        status={audiobookDisplayStatus}
+                        audiobook
+                        missing={audiobookMissing}
+                        shrink
+                      />
                     </div>
                   )}
               </div>
