@@ -2,6 +2,7 @@ import Spinner from '@app/assets/spinner.svg';
 import { CheckCircleIcon } from '@heroicons/react/20/solid';
 import {
   BellIcon,
+  BookOpenIcon,
   ClockIcon,
   EyeSlashIcon,
   MinusSmallIcon,
@@ -14,6 +15,7 @@ interface StatusBadgeMiniProps {
   status: MediaStatus;
   is4k?: boolean;
   audiobook?: boolean;
+  book?: boolean;
   inProgress?: boolean;
   // Should the badge shrink on mobile to a smaller size? (TitleCard)
   shrink?: boolean;
@@ -23,6 +25,7 @@ const StatusBadgeMini = ({
   status,
   is4k = false,
   audiobook = false,
+  book = false,
   inProgress = false,
   shrink = false,
 }: StatusBadgeMiniProps) => {
@@ -84,6 +87,11 @@ const StatusBadgeMini = ({
       {audiobook && (
         <span className="flex items-center pl-1 pr-1.5 text-gray-200">
           <SpeakerWaveIcon className="h-3 w-3" />
+        </span>
+      )}
+      {book && (
+        <span className="flex items-center pl-1 pr-1.5 text-gray-200">
+          <BookOpenIcon className="h-3 w-3" />
         </span>
       )}
     </div>

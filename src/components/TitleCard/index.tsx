@@ -516,6 +516,7 @@ const TitleCard = ({
                     <StatusBadgeMini
                       status={currentStatus}
                       inProgress={inProgress}
+                      book={mediaType === 'book'}
                       shrink
                     />
                   </div>
