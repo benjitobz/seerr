@@ -3,6 +3,7 @@ import { CheckCircleIcon } from '@heroicons/react/20/solid';
 import {
   BellIcon,
   BookOpenIcon,
+  CheckIcon,
   ClockIcon,
   EyeSlashIcon,
   MinusSmallIcon,
@@ -35,7 +36,7 @@ const StatusBadgeMini = ({
     `rounded-full shadow-md ${
       hasFormatIcon
         ? `flex items-center gap-0.5 ${
-            shrink ? 'h-4 border px-1 sm:h-5' : 'ring-1 px-1.5 py-0.5'
+            shrink ? 'h-4 border-2 px-1 sm:h-5' : 'ring-2 px-1.5 py-0.5'
           }`
         : shrink
           ? 'w-4 sm:w-5 border p-0'
@@ -60,7 +61,7 @@ const StatusBadgeMini = ({
           ? 'bg-white border-green-500 ring-green-500 text-green-600'
           : 'bg-green-500/80 border-green-400 ring-green-400 text-green-100'
       );
-      indicatorIcon = <CheckCircleIcon />;
+      indicatorIcon = hasFormatIcon ? <CheckIcon /> : <CheckCircleIcon />;
       break;
     case MediaStatus.PENDING:
       badgeStyle.push(
