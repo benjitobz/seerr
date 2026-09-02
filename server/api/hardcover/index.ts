@@ -209,50 +209,6 @@ class Hardcover extends ExternalAPI {
     }
   };
 
-  public getBooksByGenre = async ({
-    genreSlug,
-    page = 1,
-  }: {
-    genreSlug: string;
-    page?: number;
-  }): Promise<BookResponse> => {
-    try {
-      const limit = 20;
-      const offset = (page - 1) * limit;
-
-      const data = await this.post<BookResponse>('/', {
-        query: `
-          query BooksByGenre($tags: jsonb!, $limit: Int!, $offset: Int!) {
-            books(
-              where: {cached_tags: {_contains: $tags}, book_status_id: {_eq: "1"}, compilation: {_eq: false}}
-              order_by: {users_count: desc}
-              limit: $limit
-              offset: $offset
-            ) {
-              ${BOOK_RESULT}
-            }
-          }
-        `,
-        variables: {
-          tags: { Genre: [{ tagSlug: genreSlug }] },
-          limit,
-          offset,
-        },
-      });
-
-      return {
-        data: { books: data.data.books },
-        page,
-        total_results: 1000,
-        total_pages: 50,
-      };
-    } catch (e) {
-      throw new Error(
-        `[HARDCOVER] Failed to fetch books by genre: ${e.message}`
-      );
-    }
-  };
-
   public getAuthor = async (
     authorId: number
   ): Promise<HardcoverAuthorDetails> => {
