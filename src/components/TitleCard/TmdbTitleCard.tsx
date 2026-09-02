@@ -3,6 +3,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import type { BookDetails } from '@server/models/Book';
 import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
+import { useEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import useSWR from 'swr';
 
@@ -52,7 +53,17 @@ const TmdbTitleCard = ({
     inView ? `${url}` : null
   );
 
-  if (!title && !error) {
+  const [showError, setShowError] = useState(false);
+  useEffect(() => {
+    if (!error || title) {
+      setShowError(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowError(true), 10000);
+    return () => clearTimeout(timer);
+  }, [error, title]);
+
+  if (!title && (!error || !showError)) {
     return (
       <div ref={ref}>
         <TitleCard.Placeholder canExpand={canExpand} />
