@@ -105,7 +105,17 @@ const BookDetails = ({ book }: BookDetailsProps) => {
     iOSPlexUrl4k: data?.mediaInfo?.iOSPlexUrl4k,
   });
 
-  if (!data && !error) {
+  const [showError, setShowError] = useState(false);
+  useEffect(() => {
+    if (!error || data) {
+      setShowError(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowError(true), 10000);
+    return () => clearTimeout(timer);
+  }, [error, data]);
+
+  if (!data && (!error || !showError)) {
     return <LoadingSpinner />;
   }
 
