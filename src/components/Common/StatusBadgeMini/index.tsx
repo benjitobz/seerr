@@ -8,6 +8,7 @@ import {
   MinusSmallIcon,
   SpeakerWaveIcon,
   TrashIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/solid';
 import { MediaStatus } from '@server/constants/media';
 
@@ -16,6 +17,7 @@ interface StatusBadgeMiniProps {
   is4k?: boolean;
   audiobook?: boolean;
   book?: boolean;
+  missing?: boolean;
   inProgress?: boolean;
   // Should the badge shrink on mobile to a smaller size? (TitleCard)
   shrink?: boolean;
@@ -26,6 +28,7 @@ const StatusBadgeMini = ({
   is4k = false,
   audiobook = false,
   book = false,
+  missing = false,
   inProgress = false,
   shrink = false,
 }: StatusBadgeMiniProps) => {
@@ -78,6 +81,12 @@ const StatusBadgeMini = ({
       badgeStyle.push('bg-red-500/80 border-red-400 ring-red-400 text-red-100');
       indicatorIcon = <TrashIcon />;
       break;
+  }
+
+  if (missing) {
+    badgeStyle.splice(1);
+    badgeStyle.push('bg-red-500/80 border-red-400 ring-red-400 text-red-100');
+    indicatorIcon = <XMarkIcon />;
   }
 
   if (inProgress) {
