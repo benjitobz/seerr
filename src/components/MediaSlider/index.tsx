@@ -212,7 +212,7 @@ const MediaSlider = ({
       </div>
       <Slider
         sliderKey={sliderKey}
-        isLoading={!data && !error}
+        isLoading={!data}
         isEmpty={false}
         items={finalTitles}
       />
