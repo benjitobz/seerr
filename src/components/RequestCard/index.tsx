@@ -328,7 +328,17 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     }
   }, [title, onTitleData, request]);
 
-  if (!title && !error) {
+  const [showError, setShowError] = useState(false);
+  useEffect(() => {
+    if (!error || title) {
+      setShowError(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowError(true), 10000);
+    return () => clearTimeout(timer);
+  }, [error, title]);
+
+  if (!title && (!error || !showError)) {
     return (
       <div ref={ref}>
         <RequestCardPlaceholder />
