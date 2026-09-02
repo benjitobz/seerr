@@ -77,6 +77,7 @@ const TmdbTitleCard = ({
       id={title.id}
       image={title.posterPath}
       status={title.mediaInfo?.status}
+      status4k={title.mediaInfo?.status4k}
       summary={title.description}
       title={title.title}
       year={title.releaseDate}
