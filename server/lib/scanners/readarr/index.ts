@@ -120,6 +120,12 @@ class ReadarrScanner
     const hcId = parseInt(readarrBook.foreignBookId, 10);
 
     if (isNaN(hcId)) {
+      const hasFile = (readarrBook.statistics?.bookFileCount ?? 0) > 0;
+
+      if (!readarrBook.monitored && !readarrBook.grabbed && !hasFile) {
+        return;
+      }
+
       this.log('Invalid Hardcover ID for book. Skipping item.', 'warn', {
         title: readarrBook.title,
         foreignBookId: readarrBook.foreignBookId,
