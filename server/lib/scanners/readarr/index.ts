@@ -11,6 +11,7 @@ import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { ReadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { uniqWith } from 'lodash';
+import { In } from 'typeorm';
 
 type SyncStatus = StatusBase & {
   currentServer: ReadarrSettings;
@@ -271,11 +272,18 @@ class ReadarrScanner
     const mediaRepository = getRepository(Media);
 
     if (this.didScanStandard) {
-      const processingBooks = await mediaRepository.find({
-        where: { mediaType: MediaType.BOOK, status: MediaStatus.PROCESSING },
+      const trackedBooks = await mediaRepository.find({
+        where: {
+          mediaType: MediaType.BOOK,
+          status: In([
+            MediaStatus.PROCESSING,
+            MediaStatus.AVAILABLE,
+            MediaStatus.PARTIALLY_AVAILABLE,
+          ]),
+        },
       });
 
-      for (const media of processingBooks) {
+      for (const media of trackedBooks) {
         if (!this.scannedHcIds.has(media.tmdbId)) {
           media.status = MediaStatus.UNKNOWN;
           await mediaRepository.save(media);
@@ -293,14 +301,18 @@ class ReadarrScanner
     }
 
     if (this.didScanAudio) {
-      const processingAudioBooks = await mediaRepository.find({
+      const trackedAudioBooks = await mediaRepository.find({
         where: {
           mediaType: MediaType.BOOK,
-          status4k: MediaStatus.PROCESSING,
+          status4k: In([
+            MediaStatus.PROCESSING,
+            MediaStatus.AVAILABLE,
+            MediaStatus.PARTIALLY_AVAILABLE,
+          ]),
         },
       });
 
-      for (const media of processingAudioBooks) {
+      for (const media of trackedAudioBooks) {
         if (!this.scannedAudioHcIds.has(media.tmdbId)) {
           media.status4k = MediaStatus.UNKNOWN;
           await mediaRepository.save(media);
