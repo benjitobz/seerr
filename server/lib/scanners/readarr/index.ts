@@ -80,28 +80,25 @@ class ReadarrScanner
         }
       }
 
-      // Only run orphan cleanup during full scans
-      if (!this.isRecentOnly) {
-        // Only run cleanup if all servers of this profile type have sync enabled.
-        // If any server is skipped, we can't distinguish truly orphaned media from
-        // media that exists on an unscanned server (e.g. separate instances for
-        // different genres or languages).
-        const allStandardScanned = this.servers
-          .filter((s) => !this.enableAudioBook || !s.is4k)
-          .every((s) => s.syncEnabled);
-        const allAudioScanned = this.servers
-          .filter((s) => this.enableAudioBook && s.is4k)
-          .every((s) => s.syncEnabled);
+      // Only run cleanup if all servers of this profile type have sync enabled.
+      // If any server is skipped, we can't distinguish truly orphaned media from
+      // media that exists on an unscanned server (e.g. separate instances for
+      // different genres or languages).
+      const allStandardScanned = this.servers
+        .filter((s) => !this.enableAudioBook || !s.is4k)
+        .every((s) => s.syncEnabled);
+      const allAudioScanned = this.servers
+        .filter((s) => this.enableAudioBook && s.is4k)
+        .every((s) => s.syncEnabled);
 
-        if (!allStandardScanned) {
-          this.didScanStandard = false;
-        }
-        if (!allAudioScanned) {
-          this.didScanAudio = false;
-        }
-
-        await this.cleanupOrphanedBooks();
+      if (!allStandardScanned) {
+        this.didScanStandard = false;
       }
+      if (!allAudioScanned) {
+        this.didScanAudio = false;
+      }
+
+      await this.cleanupOrphanedBooks();
 
       this.log(
         this.isRecentOnly
@@ -168,6 +165,26 @@ class ReadarrScanner
     const existingMediaMap = new Map(existingMedia.map((m) => [m.tmdbId, m]));
 
     const serverAudio = this.enableAudioBook && server.is4k;
+
+    // Readarr's full book list is authoritative here, so record every book it
+    // still knows about; orphan cleanup relies on a complete set.
+    if (serverAudio) {
+      this.didScanAudio = true;
+    } else {
+      this.didScanStandard = true;
+    }
+
+    allBooks.forEach((book) => {
+      const hcId = parseInt(book.foreignBookId, 10);
+      if (isNaN(hcId)) {
+        return;
+      }
+      if (serverAudio) {
+        this.scannedAudioHcIds.add(hcId);
+      } else {
+        this.scannedHcIds.add(hcId);
+      }
+    });
 
     this.items = allBooks.filter((book) => {
       const hcId = parseInt(book.foreignBookId, 10);
