@@ -1,3 +1,4 @@
+import Button from '@app/components/Common/Button';
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import RequestModal from '@app/components/RequestModal';
 import useSettings from '@app/hooks/useSettings';
@@ -25,6 +26,7 @@ const messages = defineMessages('components.RequestButton', {
   requestmore: 'Request More',
   requestmore4k: 'Request More in 4K',
   requestmoreaudiobook: 'Request More Audiobook',
+  requestebook: 'Request eBook',
   approverequest: 'Approve Request',
   approverequest4k: 'Approve 4K Request',
   approverequestaudiobook: 'Approve Audiobook Request',
@@ -71,6 +73,13 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
+
+  // A synced book request is submitted from the ebook modal, so the separate
+  // audiobook button would duplicate it
+  const syncBookFormats =
+    mediaType === 'book' &&
+    settings.currentSettings.syncBookFormatRequests &&
+    settings.currentSettings.bookAudioEnabled;
 
   // All pending requests
   const activeRequests = media?.requests.filter(
@@ -288,7 +297,7 @@ const RequestButton = ({
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
-    hasPermission(
+    (hasPermission(
       [
         Permission.REQUEST,
         mediaType === 'movie'
@@ -298,11 +307,21 @@ const RequestButton = ({
             : Permission.REQUEST_BOOK,
       ],
       { type: 'or' }
-    )
+    ) ||
+      (syncBookFormats &&
+        hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+          type: 'or',
+        })))
   ) {
     buttons.push({
       id: 'request',
-      text: intl.formatMessage(globalMessages.request),
+      text: intl.formatMessage(
+        mediaType === 'book' &&
+          !syncBookFormats &&
+          settings.currentSettings.bookAudioEnabled
+          ? messages.requestebook
+          : globalMessages.request
+      ),
       action: () => {
         setEditRequest(false);
         setShowRequestModal(true);
@@ -348,7 +367,11 @@ const RequestButton = ({
     ) &&
     ((settings.currentSettings.movie4kEnabled && mediaType === 'movie') ||
       (settings.currentSettings.series4kEnabled && mediaType === 'tv') ||
-      (settings.currentSettings.bookAudioEnabled && mediaType === 'book'))
+      (settings.currentSettings.bookAudioEnabled &&
+        mediaType === 'book' &&
+        !(
+          syncBookFormats && buttons.some((button) => button.id === 'request')
+        )))
   ) {
     buttons.push({
       id: 'request4k',
@@ -416,28 +439,43 @@ const RequestButton = ({
         }}
         onCancel={() => setShowRequest4kModal(false)}
       />
-      <ButtonWithDropdown
-        text={
-          <>
-            {buttonOne.svg}
-            <span>{buttonOne.text}</span>
-          </>
-        }
-        onClick={buttonOne.action}
-        className="ml-2"
-      >
-        {others && others.length > 0
-          ? others.map((button) => (
-              <ButtonWithDropdown.Item
-                onClick={button.action}
-                key={`request-option-${button.id}`}
-              >
-                {button.svg}
-                <span>{button.text}</span>
-              </ButtonWithDropdown.Item>
-            ))
-          : null}
-      </ButtonWithDropdown>
+      {mediaType === 'book' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {buttons.map((button) => (
+            <Button
+              key={`request-option-${button.id}`}
+              buttonType="primary"
+              onClick={button.action}
+            >
+              {button.svg}
+              <span>{button.text}</span>
+            </Button>
+          ))}
+        </div>
+      ) : (
+        <ButtonWithDropdown
+          text={
+            <>
+              {buttonOne.svg}
+              <span>{buttonOne.text}</span>
+            </>
+          }
+          onClick={buttonOne.action}
+          className="ml-2"
+        >
+          {others && others.length > 0
+            ? others.map((button) => (
+                <ButtonWithDropdown.Item
+                  onClick={button.action}
+                  key={`request-option-${button.id}`}
+                >
+                  {button.svg}
+                  <span>{button.text}</span>
+                </ButtonWithDropdown.Item>
+              ))
+            : null}
+        </ButtonWithDropdown>
+      )}
     </>
   );
 };

@@ -9,6 +9,7 @@ import CopyButton from '@app/components/Settings/CopyButton';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useLocale from '@app/hooks/useLocale';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -71,6 +72,11 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
   partialRequestsEnabled: 'Allow Partial Series Requests',
   enableSpecialEpisodes: 'Allow Special Episodes Requests',
+  syncBookFormatRequests: 'Sync Ebook and Audiobook Requests',
+  syncBookFormatRequestsTip:
+    'Requesting one format will also request the other',
+  syncBookFormatRequestsDisabledTip:
+    'A default Audiobook Readarr server must be configured to enable this setting',
   locale: 'Display Language',
   youtubeUrl: 'YouTube URL',
   youtubeUrlTip:
@@ -84,6 +90,7 @@ const SettingsMain = () => {
   const { user: currentUser, hasPermission: userHasPermission } = useUser();
   const intl = useIntl();
   const { setLocale } = useLocale();
+  const settings = useSettings();
   const {
     data,
     error,
@@ -183,6 +190,7 @@ const SettingsMain = () => {
             blocklistedTagsLimit: data?.blocklistedTagsLimit || 50,
             partialRequestsEnabled: data?.partialRequestsEnabled,
             enableSpecialEpisodes: data?.enableSpecialEpisodes,
+            syncBookFormatRequests: data?.syncBookFormatRequests,
             cacheImages: data?.cacheImages,
             youtubeUrl: data?.youtubeUrl,
           }}
@@ -206,6 +214,7 @@ const SettingsMain = () => {
                 blocklistedTagsLimit: values.blocklistedTagsLimit,
                 partialRequestsEnabled: values.partialRequestsEnabled,
                 enableSpecialEpisodes: values.enableSpecialEpisodes,
+                syncBookFormatRequests: values.syncBookFormatRequests,
                 cacheImages: values.cacheImages,
                 youtubeUrl: values.youtubeUrl,
               });
@@ -604,6 +613,37 @@ const SettingsMain = () => {
                         setFieldValue(
                           'enableSpecialEpisodes',
                           !values.enableSpecialEpisodes
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label
+                    htmlFor="syncBookFormatRequests"
+                    className="checkbox-label"
+                  >
+                    <span className="mr-2">
+                      {intl.formatMessage(messages.syncBookFormatRequests)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(
+                        settings.currentSettings.bookAudioEnabled
+                          ? messages.syncBookFormatRequestsTip
+                          : messages.syncBookFormatRequestsDisabledTip
+                      )}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="syncBookFormatRequests"
+                      name="syncBookFormatRequests"
+                      disabled={!settings.currentSettings.bookAudioEnabled}
+                      onChange={() => {
+                        setFieldValue(
+                          'syncBookFormatRequests',
+                          !values.syncBookFormatRequests
                         );
                       }}
                     />

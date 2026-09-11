@@ -8,6 +8,7 @@ import RequestModal from '@app/components/RequestModal';
 import ErrorCard from '@app/components/TitleCard/ErrorCard';
 import Placeholder from '@app/components/TitleCard/Placeholder';
 import { useIsTouch } from '@app/hooks/useIsTouch';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -73,6 +74,7 @@ const TitleCard = ({
   const isTouch = useIsTouch();
   const intl = useIntl();
   const { user, hasPermission } = useUser();
+  const settings = useSettings();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [showDetail, setShowDetail] = useState(false);
@@ -302,17 +304,26 @@ const TitleCard = ({
 
   const closeModal = useCallback(() => setShowRequestModal(false), []);
 
-  const showRequestButton = hasPermission(
-    [
-      Permission.REQUEST,
-      mediaType === 'movie' ||
-      mediaType === 'collection' ||
-      mediaType === 'book'
-        ? Permission.REQUEST_MOVIE
-        : Permission.REQUEST_TV,
-    ],
-    { type: 'or' }
-  );
+  // The card always opens the ebook modal, which only covers audiobooks when
+  // format syncing is on
+  const showRequestButton =
+    hasPermission(
+      [
+        Permission.REQUEST,
+        mediaType === 'movie' ||
+        mediaType === 'collection' ||
+        mediaType === 'book'
+          ? Permission.REQUEST_MOVIE
+          : Permission.REQUEST_TV,
+      ],
+      { type: 'or' }
+    ) ||
+    (mediaType === 'book' &&
+      settings.currentSettings.syncBookFormatRequests &&
+      settings.currentSettings.bookAudioEnabled &&
+      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+        type: 'or',
+      }));
 
   const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',

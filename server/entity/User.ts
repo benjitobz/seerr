@@ -371,17 +371,28 @@ export class User {
       bookDate.setDate(bookDate.getDate() - bookQuotaDays);
     }
 
+    // Ebook and audiobook requests for the same book are a single user action
+    // when format syncing is on, so quota counts distinct books rather than rows
+    const bookQuotaUsedQuery = requestRepository
+      .createQueryBuilder('request')
+      .leftJoin('request.requestedBy', 'requestedBy')
+      .where('request.type = :requestType', { requestType: MediaType.BOOK })
+      .andWhere('requestedBy.id = :userId', { userId: this.id })
+      .andWhere('request.status != :declinedStatus', {
+        declinedStatus: MediaRequestStatus.DECLINED,
+      });
+
+    if (bookQuotaDays) {
+      bookQuotaUsedQuery.andWhere('request.createdAt > :date', {
+        date: bookDate.toJSON(),
+      });
+    }
+
     const bookQuotaUsed = bookQuotaLimit
-      ? await requestRepository.count({
-          where: {
-            requestedBy: {
-              id: this.id,
-            },
-            ...(bookQuotaDays ? { createdAt: AfterDate(bookDate) } : {}),
-            type: MediaType.BOOK,
-            status: Not(MediaRequestStatus.DECLINED),
-          },
-        })
+      ? await bookQuotaUsedQuery
+          .select('COUNT(DISTINCT request.mediaId)', 'count')
+          .getRawOne()
+          .then((result) => Number(result?.count ?? 0))
       : 0;
 
     return {
