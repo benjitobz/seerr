@@ -309,17 +309,26 @@ const TitleCard = ({
 
   const closeModal = useCallback(() => setShowRequestModal(false), []);
 
-  const showRequestButton = hasPermission(
-    [
-      Permission.REQUEST,
-      mediaType === 'book'
-        ? Permission.REQUEST_BOOK
-        : mediaType === 'movie' || mediaType === 'collection'
-          ? Permission.REQUEST_MOVIE
-          : Permission.REQUEST_TV,
-    ],
-    { type: 'or' }
-  );
+  // The card always opens the ebook modal, which only covers audiobooks when
+  // format syncing is on
+  const showRequestButton =
+    hasPermission(
+      [
+        Permission.REQUEST,
+        mediaType === 'book'
+          ? Permission.REQUEST_BOOK
+          : mediaType === 'movie' || mediaType === 'collection'
+            ? Permission.REQUEST_MOVIE
+            : Permission.REQUEST_TV,
+      ],
+      { type: 'or' }
+    ) ||
+    (mediaType === 'book' &&
+      settings.currentSettings.syncBookFormatRequests &&
+      settings.currentSettings.bookAudioEnabled &&
+      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+        type: 'or',
+      }));
 
   const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
