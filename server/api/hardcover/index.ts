@@ -8,6 +8,7 @@ import {
 } from '@server/api/hardcover/constants';
 import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import type {
   AuthorByPKResponse,
@@ -28,6 +29,10 @@ import type {
 } from './interfaces';
 
 interface DiscoverBookOptions {
+  genres?: string[];
+  releaseDateGte?: string;
+  releaseDateLte?: string;
+  sortBy?: string;
   page?: number;
 }
 
@@ -50,6 +55,45 @@ export const getHeader = (tags: Tags): string | null => {
   return null;
 };
 
+const RATE_LIMIT_RETRIES = 2;
+const RATE_LIMIT_MAX_WAIT_MS = 10_000;
+
+type RetryableConfig = InternalAxiosRequestConfig & {
+  hardcoverRetries?: number;
+};
+
+export const retryOnRateLimit = (instance: AxiosInstance): void => {
+  instance.interceptors.response.use(undefined, async (error) => {
+    const config = error?.config as RetryableConfig | undefined;
+
+    if (error?.response?.status !== 429 || !config) {
+      throw error;
+    }
+
+    const attempt = (config.hardcoverRetries ?? 0) + 1;
+
+    if (attempt > RATE_LIMIT_RETRIES) {
+      throw error;
+    }
+
+    config.hardcoverRetries = attempt;
+
+    const retryAfterSeconds = Number(error.response.headers?.['retry-after']);
+    const waitMs =
+      Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? Math.min(retryAfterSeconds * 1000, RATE_LIMIT_MAX_WAIT_MS)
+        : attempt * 2000;
+
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+    return instance.request(config);
+  });
+};
+
+// Routes create a client per request, so the limiter has to be shared to keep
+// the server inside Hardcover's 60 requests a minute.
+let sharedClient: { token: string; axios: AxiosInstance } | undefined;
+
 class Hardcover extends ExternalAPI {
   constructor() {
     const token = getSettings().main.hardcoverapikey;
@@ -67,6 +111,13 @@ class Hardcover extends ExternalAPI {
         },
       }
     );
+
+    if (!sharedClient || sharedClient.token !== token) {
+      retryOnRateLimit(this.axios);
+      sharedClient = { token, axios: this.axios };
+    }
+
+    this.axios = sharedClient.axios;
   }
 
   private getTrendingBooks = async (offset = 0): Promise<number[]> => {
@@ -190,17 +241,95 @@ class Hardcover extends ExternalAPI {
 
   public getDiscoverBooks = async ({
     page = 1,
+    genres,
+    releaseDateGte,
+    releaseDateLte,
+    sortBy,
   }: DiscoverBookOptions = {}): Promise<BookResponse> => {
     try {
-      const offset = Math.floor((page - 1) * 50);
+      const hasFilters = !!(
+        genres?.length ||
+        releaseDateGte ||
+        releaseDateLte ||
+        (sortBy && sortBy !== 'popularity.desc')
+      );
 
-      const ids = await this.getTrendingBooks(offset);
+      if (!hasFilters) {
+        const offset = Math.floor((page - 1) * 50);
+
+        const ids = await this.getTrendingBooks(offset);
+
+        return {
+          data: await this.getBooks(ids),
+          page: page,
+          total_results: 10000,
+          total_pages: 200,
+        };
+      }
+
+      const limit = 20;
+      const offset = (page - 1) * limit;
+
+      const slugPattern = /^[a-z0-9-]+$/;
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+      const conditions: string[] = [
+        '{book_status_id: {_eq: "1"}}',
+        '{compilation: {_eq: false}}',
+      ];
+      (genres ?? [])
+        .filter((genre) => slugPattern.test(genre))
+        .forEach((genre) => {
+          conditions.push(
+            `{cached_tags: {_contains: {Genre: [{tagSlug: "${genre}"}]}}}`
+          );
+        });
+      if (releaseDateGte && datePattern.test(releaseDateGte)) {
+        conditions.push(`{release_date: {_gte: "${releaseDateGte}"}}`);
+      }
+      if (releaseDateLte && datePattern.test(releaseDateLte)) {
+        conditions.push(`{release_date: {_lte: "${releaseDateLte}"}}`);
+      } else if (sortBy === 'release_date.desc') {
+        const maxDate = new Date();
+        maxDate.setFullYear(maxDate.getFullYear() + 1);
+        conditions.push(
+          `{release_date: {_lte: "${maxDate.toISOString().split('T')[0]}"}}`
+        );
+      }
+
+      const orderMap: Record<string, string> = {
+        'popularity.asc': '{users_count: asc}',
+        'popularity.desc': '{users_count: desc}',
+        'release_date.asc': '{release_date: asc}',
+        'release_date.desc': '{release_date: desc}',
+        'original_title.asc': '{title: asc}',
+        'original_title.desc': '{title: desc}',
+      };
+
+      const data = await this.post<BookResponse>('/', {
+        query: `
+          query DiscoverBooksFiltered($limit: Int!, $offset: Int!) {
+            books(
+              where: {_and: [${conditions.join(', ')}]}
+              order_by: ${orderMap[sortBy ?? ''] ?? '{users_count: desc}'}
+              limit: $limit
+              offset: $offset
+            ) {
+              ${BOOK_RESULT}
+            }
+          }
+        `,
+        variables: {
+          limit,
+          offset,
+        },
+      });
 
       return {
-        data: await this.getBooks(ids),
-        page: page,
-        total_results: 10000,
-        total_pages: 200,
+        data: { books: data.data.books },
+        page,
+        total_results: 1000,
+        total_pages: 50,
       };
     } catch (e) {
       throw new Error(

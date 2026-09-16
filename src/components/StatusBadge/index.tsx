@@ -15,6 +15,7 @@ const messages = defineMessages('components.StatusBadge', {
   status: '{status}',
   status4k: '4K {status}',
   statusAudiobook: 'Audiobook {status}',
+  statusEbook: 'Ebook {status}',
   playonplex: 'Play on {mediaServerName}',
   openinarr: 'Open in {arr}',
   managemedia: 'Manage {mediaType}',
@@ -195,7 +196,9 @@ const StatusBadge = ({
                     ? mediaType === 'book'
                       ? messages.statusAudiobook
                       : messages.status4k
-                    : messages.status,
+                    : mediaType === 'book'
+                      ? messages.statusEbook
+                      : messages.status,
                   {
                     status: inProgress
                       ? intl.formatMessage(globalMessages.processing)
@@ -260,11 +263,11 @@ const StatusBadge = ({
             >
               <span>
                 {intl.formatMessage(
-                  is4k
-                    ? mediaType === 'book'
-                      ? messages.statusAudiobook
-                      : messages.status4k
-                    : messages.status,
+                  mediaType === 'book'
+                    ? messages.status
+                    : is4k
+                      ? messages.status4k
+                      : messages.status,
                   {
                     status: inProgress
                       ? intl.formatMessage(globalMessages.processing)
@@ -333,7 +336,9 @@ const StatusBadge = ({
                     ? mediaType === 'book'
                       ? messages.statusAudiobook
                       : messages.status4k
-                    : messages.status,
+                    : mediaType === 'book'
+                      ? messages.statusEbook
+                      : messages.status,
                   {
                     status: inProgress
                       ? intl.formatMessage(globalMessages.processing)
@@ -381,7 +386,9 @@ const StatusBadge = ({
                 ? mediaType === 'book'
                   ? messages.statusAudiobook
                   : messages.status4k
-                : messages.status,
+                : mediaType === 'book'
+                  ? messages.statusEbook
+                  : messages.status,
               {
                 status: intl.formatMessage(globalMessages.pending),
               }
@@ -399,7 +406,9 @@ const StatusBadge = ({
                 ? mediaType === 'book'
                   ? messages.statusAudiobook
                   : messages.status4k
-                : messages.status,
+                : mediaType === 'book'
+                  ? messages.statusEbook
+                  : messages.status,
               {
                 status:
                   statusLabelOverride ??
@@ -440,7 +449,9 @@ const StatusBadge = ({
                     ? mediaType === 'book'
                       ? messages.statusAudiobook
                       : messages.status4k
-                    : messages.status,
+                    : mediaType === 'book'
+                      ? messages.statusEbook
+                      : messages.status,
                   {
                     status: inProgress
                       ? intl.formatMessage(globalMessages.processing)

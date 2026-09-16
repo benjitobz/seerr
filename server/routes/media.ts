@@ -99,10 +99,14 @@ mediaRoutes.get('/', async (req, res, next) => {
 
   let whereClause: FindOneOptions<Media>['where'];
   if (statusFilter || req.query.sort === 'mediaAdded') {
-    whereClause = {};
-    if (statusFilter) whereClause.status = statusFilter;
-    if (req.query.sort === 'mediaAdded')
-      whereClause.mediaAddedAt = Not(IsNull());
+    const mediaAddedClause =
+      req.query.sort === 'mediaAdded' ? { mediaAddedAt: Not(IsNull()) } : {};
+    whereClause = statusFilter
+      ? [
+          { ...mediaAddedClause, status: statusFilter },
+          { ...mediaAddedClause, status4k: statusFilter },
+        ]
+      : mediaAddedClause;
   }
 
   try {
@@ -286,7 +290,7 @@ mediaRoutes.delete(
       const serviceType = is4k ? (isBook ? 'Audiobook' : '4K ') : '';
 
       if (!serviceSettings) {
-const arrName = serviceType + serviceName;
+        const arrName = serviceType + serviceName;
         logger.info(
           `There is no default ${arrName} server configured. Did you set any of your ${arrName} servers as default?`,
           {

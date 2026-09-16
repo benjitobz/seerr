@@ -5989,6 +5989,22 @@ paths:
             type: number
             example: 1
             default: 1
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+        - in: query
+          name: genre
+          schema:
+            type: string
+        - in: query
+          name: primaryReleaseDateGte
+          schema:
+            type: string
+        - in: query
+          name: primaryReleaseDateLte
+          schema:
+            type: string
       responses:
         '200':
           description: Results

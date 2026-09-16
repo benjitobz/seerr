@@ -11,6 +11,7 @@ import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { ReadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { uniqWith } from 'lodash';
+import { In } from 'typeorm';
 
 type SyncStatus = StatusBase & {
   currentServer: ReadarrSettings;
@@ -80,28 +81,25 @@ class ReadarrScanner
         }
       }
 
-      // Only run orphan cleanup during full scans
-      if (!this.isRecentOnly) {
-        // Only run cleanup if all servers of this profile type have sync enabled.
-        // If any server is skipped, we can't distinguish truly orphaned media from
-        // media that exists on an unscanned server (e.g. separate instances for
-        // different genres or languages).
-        const allStandardScanned = this.servers
-          .filter((s) => !this.enableAudioBook || !s.is4k)
-          .every((s) => s.syncEnabled);
-        const allAudioScanned = this.servers
-          .filter((s) => this.enableAudioBook && s.is4k)
-          .every((s) => s.syncEnabled);
+      // Only run cleanup if all servers of this profile type have sync enabled.
+      // If any server is skipped, we can't distinguish truly orphaned media from
+      // media that exists on an unscanned server (e.g. separate instances for
+      // different genres or languages).
+      const allStandardScanned = this.servers
+        .filter((s) => !this.enableAudioBook || !s.is4k)
+        .every((s) => s.syncEnabled);
+      const allAudioScanned = this.servers
+        .filter((s) => this.enableAudioBook && s.is4k)
+        .every((s) => s.syncEnabled);
 
-        if (!allStandardScanned) {
-          this.didScanStandard = false;
-        }
-        if (!allAudioScanned) {
-          this.didScanAudio = false;
-        }
-
-        await this.cleanupOrphanedBooks();
+      if (!allStandardScanned) {
+        this.didScanStandard = false;
       }
+      if (!allAudioScanned) {
+        this.didScanAudio = false;
+      }
+
+      await this.cleanupOrphanedBooks();
 
       this.log(
         this.isRecentOnly
@@ -169,6 +167,26 @@ class ReadarrScanner
 
     const serverAudio = this.enableAudioBook && server.is4k;
 
+    // Readarr's full book list is authoritative here, so record every book it
+    // still knows about; orphan cleanup relies on a complete set.
+    if (serverAudio) {
+      this.didScanAudio = true;
+    } else {
+      this.didScanStandard = true;
+    }
+
+    allBooks.forEach((book) => {
+      const hcId = parseInt(book.foreignBookId, 10);
+      if (isNaN(hcId)) {
+        return;
+      }
+      if (serverAudio) {
+        this.scannedAudioHcIds.add(hcId);
+      } else {
+        this.scannedHcIds.add(hcId);
+      }
+    });
+
     this.items = allBooks.filter((book) => {
       const hcId = parseInt(book.foreignBookId, 10);
       if (isNaN(hcId)) return false;
@@ -221,7 +239,13 @@ class ReadarrScanner
     const hcId = parseInt(readarrBook.foreignBookId, 10);
 
     if (isNaN(hcId)) {
-      this.log('Invalid Hardcover ID for book. Skipping item.', 'debug', {
+      const hasFile = (readarrBook.statistics?.bookFileCount ?? 0) > 0;
+
+      if (!readarrBook.monitored && !readarrBook.grabbed && !hasFile) {
+        return;
+      }
+
+      this.log('Invalid Hardcover ID for book. Skipping item.', 'warn', {
         title: readarrBook.title,
         foreignBookId: readarrBook.foreignBookId,
       });
@@ -265,11 +289,18 @@ class ReadarrScanner
     const mediaRepository = getRepository(Media);
 
     if (this.didScanStandard) {
-      const processingBooks = await mediaRepository.find({
-        where: { mediaType: MediaType.BOOK, status: MediaStatus.PROCESSING },
+      const trackedBooks = await mediaRepository.find({
+        where: {
+          mediaType: MediaType.BOOK,
+          status: In([
+            MediaStatus.PROCESSING,
+            MediaStatus.AVAILABLE,
+            MediaStatus.PARTIALLY_AVAILABLE,
+          ]),
+        },
       });
 
-      for (const media of processingBooks) {
+      for (const media of trackedBooks) {
         if (!this.scannedHcIds.has(media.tmdbId)) {
           media.status = MediaStatus.UNKNOWN;
           await mediaRepository.save(media);
@@ -287,14 +318,18 @@ class ReadarrScanner
     }
 
     if (this.didScanAudio) {
-      const processingAudioBooks = await mediaRepository.find({
+      const trackedAudioBooks = await mediaRepository.find({
         where: {
           mediaType: MediaType.BOOK,
-          status4k: MediaStatus.PROCESSING,
+          status4k: In([
+            MediaStatus.PROCESSING,
+            MediaStatus.AVAILABLE,
+            MediaStatus.PARTIALLY_AVAILABLE,
+          ]),
         },
       });
 
-      for (const media of processingAudioBooks) {
+      for (const media of trackedAudioBooks) {
         if (!this.scannedAudioHcIds.has(media.tmdbId)) {
           media.status4k = MediaStatus.UNKNOWN;
           await mediaRepository.save(media);

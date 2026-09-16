@@ -45,7 +45,7 @@ const MediaSlider = ({
 }: MediaSliderProps) => {
   const settings = useSettings();
   const { hasPermission } = useUser();
-  const { data, error, setSize, size } = useSWRInfinite<MixedResult>(
+  const { data, setSize, size } = useSWRInfinite<MixedResult>(
     (pageIndex: number, previousPageData: MixedResult | null) => {
       if (previousPageData && pageIndex + 1 > previousPageData.totalPages) {
         return null;
@@ -161,6 +161,8 @@ const MediaSlider = ({
               id={title.id}
               image={title.posterPath}
               status={title.mediaInfo?.status}
+              status4k={title.mediaInfo?.status4k}
+              mediaRequests={title.mediaInfo?.requests}
               summary={title.overview}
               title={title.title}
               userScore={0}
@@ -212,7 +214,7 @@ const MediaSlider = ({
       </div>
       <Slider
         sliderKey={sliderKey}
-        isLoading={!data && !error}
+        isLoading={!data}
         isEmpty={false}
         items={finalTitles}
       />

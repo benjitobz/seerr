@@ -105,7 +105,17 @@ const BookDetails = ({ book }: BookDetailsProps) => {
     iOSPlexUrl4k: data?.mediaInfo?.iOSPlexUrl4k,
   });
 
-  if (!data && !error) {
+  const [showError, setShowError] = useState(false);
+  useEffect(() => {
+    if (!error || data) {
+      setShowError(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowError(true), 20000);
+    return () => clearTimeout(timer);
+  }, [error, data]);
+
+  if (!data && (!error || !showError)) {
     return <LoadingSpinner />;
   }
 
@@ -165,6 +175,33 @@ const BookDetails = ({ book }: BookDetailsProps) => {
   const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
   });
+
+  const showAudiobookStatus =
+    settings.currentSettings.bookAudioEnabled &&
+    hasPermission(
+      [
+        Permission.MANAGE_REQUESTS,
+        Permission.REQUEST_4K,
+        Permission.REQUEST_AUDIO_BOOK,
+      ],
+      { type: 'or' }
+    );
+
+  const isAvailableStatus = (mediaStatus?: MediaStatus) =>
+    mediaStatus === MediaStatus.AVAILABLE ||
+    mediaStatus === MediaStatus.PARTIALLY_AVAILABLE;
+
+  const ebookDisplayStatus =
+    data?.mediaInfo?.status === MediaStatus.AVAILABLE &&
+    showAudiobookStatus &&
+    !isAvailableStatus(data?.mediaInfo?.status4k)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : data?.mediaInfo?.status;
+  const audiobookDisplayStatus =
+    data?.mediaInfo?.status4k === MediaStatus.AVAILABLE &&
+    !isAvailableStatus(data?.mediaInfo?.status)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : data?.mediaInfo?.status4k;
 
   return (
     <div
@@ -234,7 +271,7 @@ const BookDetails = ({ book }: BookDetailsProps) => {
         <div className="media-title">
           <div className="media-status">
             <StatusBadge
-              status={data.mediaInfo?.status}
+              status={ebookDisplayStatus}
               downloadItem={data.mediaInfo?.downloadStatus}
               title={data.title}
               inProgress={(data.mediaInfo?.downloadStatus ?? []).length > 0}
@@ -255,7 +292,7 @@ const BookDetails = ({ book }: BookDetailsProps) => {
                 }
               ) && (
                 <StatusBadge
-                  status={data.mediaInfo?.status4k}
+                  status={audiobookDisplayStatus}
                   downloadItem={data.mediaInfo?.downloadStatus4k}
                   title={data.title}
                   is4k

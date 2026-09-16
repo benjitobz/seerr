@@ -110,6 +110,10 @@ discoverRoutes.get('/books', async (req, res, next) => {
     const query = QueryFilterOptions.parse(req.query);
     const data = await hardcover.getDiscoverBooks({
       page: Number(query.page),
+      genres: query.genre ? query.genre.split(',') : undefined,
+      releaseDateGte: query.primaryReleaseDateGte,
+      releaseDateLte: query.primaryReleaseDateLte,
+      sortBy: query.sortBy,
     });
 
     const media = await Media.getRelatedMedia(

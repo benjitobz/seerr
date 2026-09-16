@@ -8,6 +8,7 @@ import RequestModal from '@app/components/RequestModal';
 import ErrorCard from '@app/components/TitleCard/ErrorCard';
 import Placeholder from '@app/components/TitleCard/Placeholder';
 import { useIsTouch } from '@app/hooks/useIsTouch';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -21,7 +22,8 @@ import {
   MinusCircleIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
-import { MediaStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { Watchlist } from '@server/entity/Watchlist';
 import type { MediaType } from '@server/models/Search';
 import axios from 'axios';
@@ -39,6 +41,8 @@ interface TitleCardProps {
   userScore?: number;
   mediaType: MediaType;
   status?: MediaStatus;
+  status4k?: MediaStatus;
+  mediaRequests?: MediaRequest[];
   canExpand?: boolean;
   inProgress?: boolean;
   position?: number;
@@ -63,6 +67,8 @@ const TitleCard = ({
   year,
   title,
   status,
+  status4k,
+  mediaRequests,
   mediaType,
   isAddedToWatchlist = false,
   inProgress = false,
@@ -72,6 +78,7 @@ const TitleCard = ({
 }: TitleCardProps) => {
   const isTouch = useIsTouch();
   const intl = useIntl();
+  const settings = useSettings();
   const { user, hasPermission } = useUser();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
@@ -302,21 +309,73 @@ const TitleCard = ({
 
   const closeModal = useCallback(() => setShowRequestModal(false), []);
 
-  const showRequestButton = hasPermission(
-    [
-      Permission.REQUEST,
-      mediaType === 'book'
-        ? Permission.REQUEST_BOOK
-        : mediaType === 'movie' || mediaType === 'collection'
-          ? Permission.REQUEST_MOVIE
-          : Permission.REQUEST_TV,
-    ],
-    { type: 'or' }
-  );
+  // The card always opens the ebook modal, which only covers audiobooks when
+  // format syncing is on
+  const showRequestButton =
+    hasPermission(
+      [
+        Permission.REQUEST,
+        mediaType === 'book'
+          ? Permission.REQUEST_BOOK
+          : mediaType === 'movie' || mediaType === 'collection'
+            ? Permission.REQUEST_MOVIE
+            : Permission.REQUEST_TV,
+      ],
+      { type: 'or' }
+    ) ||
+    (mediaType === 'book' &&
+      settings.currentSettings.syncBookFormatRequests &&
+      settings.currentSettings.bookAudioEnabled &&
+      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+        type: 'or',
+      }));
 
   const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
   });
+
+  const showAudiobookStatus =
+    mediaType === 'book' &&
+    settings.currentSettings.bookAudioEnabled &&
+    hasPermission(
+      [
+        Permission.MANAGE_REQUESTS,
+        Permission.REQUEST_4K,
+        Permission.REQUEST_AUDIO_BOOK,
+      ],
+      { type: 'or' }
+    );
+
+  const hasActiveRequest = (is4k: boolean) =>
+    !!mediaRequests?.some(
+      (request) =>
+        request.is4k === is4k &&
+        request.status !== MediaRequestStatus.DECLINED &&
+        request.status !== MediaRequestStatus.FAILED
+    );
+
+  const isAvailableStatus = (mediaStatus?: MediaStatus) =>
+    mediaStatus === MediaStatus.AVAILABLE ||
+    mediaStatus === MediaStatus.PARTIALLY_AVAILABLE;
+
+  const ebookMissing =
+    mediaType === 'book' &&
+    currentStatus === MediaStatus.PROCESSING &&
+    !hasActiveRequest(false);
+  const audiobookMissing =
+    status4k === MediaStatus.PROCESSING && !hasActiveRequest(true);
+
+  const ebookDisplayStatus =
+    mediaType === 'book' &&
+    showAudiobookStatus &&
+    currentStatus === MediaStatus.AVAILABLE &&
+    !isAvailableStatus(status4k)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : currentStatus;
+  const audiobookDisplayStatus =
+    status4k === MediaStatus.AVAILABLE && !isAvailableStatus(currentStatus)
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : status4k;
 
   return (
     <div
@@ -490,15 +549,35 @@ const TitleCard = ({
                   </Button>
                 </Tooltip>
               )}
-            {currentStatus && currentStatus !== MediaStatus.UNKNOWN && (
+            {((currentStatus && currentStatus !== MediaStatus.UNKNOWN) ||
+              (showAudiobookStatus &&
+                status4k &&
+                status4k !== MediaStatus.UNKNOWN)) && (
               <div className="flex flex-col items-center gap-1">
-                <div className="pointer-events-none z-40 flex">
-                  <StatusBadgeMini
-                    status={currentStatus}
-                    inProgress={inProgress}
-                    shrink
-                  />
-                </div>
+                {ebookDisplayStatus &&
+                  ebookDisplayStatus !== MediaStatus.UNKNOWN && (
+                    <div className="pointer-events-none z-40 flex">
+                      <StatusBadgeMini
+                        status={ebookDisplayStatus}
+                        inProgress={inProgress}
+                        book={mediaType === 'book'}
+                        missing={ebookMissing}
+                        shrink
+                      />
+                    </div>
+                  )}
+                {showAudiobookStatus &&
+                  audiobookDisplayStatus &&
+                  audiobookDisplayStatus !== MediaStatus.UNKNOWN && (
+                    <div className="pointer-events-none z-40 flex">
+                      <StatusBadgeMini
+                        status={audiobookDisplayStatus}
+                        audiobook
+                        missing={audiobookMissing}
+                        shrink
+                      />
+                    </div>
+                  )}
               </div>
             )}
           </div>
