@@ -8,6 +8,7 @@ import {
 } from '@server/api/hardcover/constants';
 import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
+import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import type {
   AuthorByPKResponse,
@@ -54,6 +55,45 @@ export const getHeader = (tags: Tags): string | null => {
   return null;
 };
 
+const RATE_LIMIT_RETRIES = 2;
+const RATE_LIMIT_MAX_WAIT_MS = 10_000;
+
+type RetryableConfig = InternalAxiosRequestConfig & {
+  hardcoverRetries?: number;
+};
+
+export const retryOnRateLimit = (instance: AxiosInstance): void => {
+  instance.interceptors.response.use(undefined, async (error) => {
+    const config = error?.config as RetryableConfig | undefined;
+
+    if (error?.response?.status !== 429 || !config) {
+      throw error;
+    }
+
+    const attempt = (config.hardcoverRetries ?? 0) + 1;
+
+    if (attempt > RATE_LIMIT_RETRIES) {
+      throw error;
+    }
+
+    config.hardcoverRetries = attempt;
+
+    const retryAfterSeconds = Number(error.response.headers?.['retry-after']);
+    const waitMs =
+      Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? Math.min(retryAfterSeconds * 1000, RATE_LIMIT_MAX_WAIT_MS)
+        : attempt * 2000;
+
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+
+    return instance.request(config);
+  });
+};
+
+// Routes create a client per request, so the limiter has to be shared to keep
+// the server inside Hardcover's 60 requests a minute.
+let sharedClient: { token: string; axios: AxiosInstance } | undefined;
+
 class Hardcover extends ExternalAPI {
   constructor() {
     const token = getSettings().main.hardcoverapikey;
@@ -71,6 +111,13 @@ class Hardcover extends ExternalAPI {
         },
       }
     );
+
+    if (!sharedClient || sharedClient.token !== token) {
+      retryOnRateLimit(this.axios);
+      sharedClient = { token, axios: this.axios };
+    }
+
+    this.axios = sharedClient.axios;
   }
 
   private getTrendingBooks = async (offset = 0): Promise<number[]> => {
