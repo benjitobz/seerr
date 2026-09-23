@@ -2,9 +2,11 @@ import Button from '@app/components/Common/Button';
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import RequestModal from '@app/components/RequestModal';
 import useSettings from '@app/hooks/useSettings';
+import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { requestBookFormats } from '@app/utils/requestBookFormats';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import {
   CheckIcon,
@@ -26,7 +28,12 @@ const messages = defineMessages('components.RequestButton', {
   requestmore: 'Request More',
   requestmore4k: 'Request More in 4K',
   requestmoreaudiobook: 'Request More Audiobook',
-  requestebook: 'Request eBook',
+  requestebook: 'Request Ebook',
+  requestboth: 'Request Both',
+  ebookrequested: 'Ebook requested successfully!',
+  audiobookrequested: 'Audiobook requested successfully!',
+  bothformatsrequested: 'Ebook and audiobook requested successfully!',
+  requesterror: 'Something went wrong while submitting the request.',
   approverequest: 'Approve Request',
   approverequest4k: 'Approve 4K Request',
   approverequestaudiobook: 'Approve Audiobook Request',
@@ -73,13 +80,8 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
-
-  // A synced book request is submitted from the ebook modal, so the separate
-  // audiobook button would duplicate it
-  const syncBookFormats =
-    mediaType === 'book' &&
-    settings.currentSettings.syncBookFormatRequests &&
-    settings.currentSettings.bookAudioEnabled;
+  const [isRequesting, setIsRequesting] = useState(false);
+  const { addToast } = useToasts();
 
   // All pending requests
   const activeRequests = media?.requests.filter(
@@ -133,6 +135,36 @@ const RequestButton = ({
 
     onUpdate();
     mutate('/api/v1/request/count');
+  };
+
+  const requestBook = async (formats: boolean[]) => {
+    setIsRequesting(true);
+    const outcomes = await requestBookFormats(tmdbId, formats);
+    const requested = outcomes
+      .filter((outcome) => outcome.request)
+      .map((outcome) => outcome.is4k);
+
+    if (requested.length) {
+      addToast(
+        intl.formatMessage(
+          requested.length > 1
+            ? messages.bothformatsrequested
+            : requested[0]
+              ? messages.audiobookrequested
+              : messages.ebookrequested
+        ),
+        { appearance: 'success', autoDismiss: true }
+      );
+    }
+    if (requested.length < formats.length) {
+      addToast(intl.formatMessage(messages.requesterror), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    }
+
+    onUpdate();
+    setIsRequesting(false);
   };
 
   const buttons: ButtonOption[] = [];
@@ -292,36 +324,72 @@ const RequestButton = ({
     }
   }
 
+  if (mediaType === 'book') {
+    const ebookRequestable =
+      hasPermission([Permission.REQUEST, Permission.REQUEST_BOOK], {
+        type: 'or',
+      }) &&
+      (!media ||
+        media.status === MediaStatus.UNKNOWN ||
+        (media.status === MediaStatus.DELETED && !activeRequest));
+    const audiobookRequestable =
+      settings.currentSettings.bookAudioEnabled &&
+      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+        type: 'or',
+      }) &&
+      (!media ||
+        media.status4k === MediaStatus.UNKNOWN ||
+        (media.status4k === MediaStatus.DELETED && !active4kRequest));
+
+    if (ebookRequestable) {
+      buttons.push({
+        id: 'request-ebook',
+        text: intl.formatMessage(
+          settings.currentSettings.bookAudioEnabled
+            ? messages.requestebook
+            : globalMessages.request
+        ),
+        action: () => requestBook([false]),
+        svg: <ArrowDownTrayIcon />,
+      });
+    }
+    if (audiobookRequestable) {
+      buttons.push({
+        id: 'request-audiobook',
+        text: intl.formatMessage(globalMessages.requestAudio),
+        action: () => requestBook([true]),
+        svg: <ArrowDownTrayIcon />,
+      });
+    }
+    if (ebookRequestable && audiobookRequestable) {
+      buttons.push({
+        id: 'request-both',
+        text: intl.formatMessage(messages.requestboth),
+        action: () => requestBook([false, true]),
+        svg: <ArrowDownTrayIcon />,
+      });
+    }
+  }
+
   // Standard request button
   if (
+    mediaType !== 'book' &&
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
-    (hasPermission(
+    hasPermission(
       [
         Permission.REQUEST,
         mediaType === 'movie'
           ? Permission.REQUEST_MOVIE
-          : mediaType === 'tv'
-            ? Permission.REQUEST_TV
-            : Permission.REQUEST_BOOK,
+          : Permission.REQUEST_TV,
       ],
       { type: 'or' }
-    ) ||
-      (syncBookFormats &&
-        hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
-          type: 'or',
-        })))
+    )
   ) {
     buttons.push({
       id: 'request',
-      text: intl.formatMessage(
-        mediaType === 'book' &&
-          !syncBookFormats &&
-          settings.currentSettings.bookAudioEnabled
-          ? messages.requestebook
-          : globalMessages.request
-      ),
+      text: intl.formatMessage(globalMessages.request),
       action: () => {
         setEditRequest(false);
         setShowRequestModal(true);
@@ -351,6 +419,7 @@ const RequestButton = ({
 
   // 4K request button
   if (
+    mediaType !== 'book' &&
     (!media ||
       media.status4k === MediaStatus.UNKNOWN ||
       (media.status4k === MediaStatus.DELETED && !active4kRequest)) &&
@@ -359,27 +428,16 @@ const RequestButton = ({
         Permission.REQUEST_4K,
         mediaType === 'movie'
           ? Permission.REQUEST_4K_MOVIE
-          : mediaType === 'tv'
-            ? Permission.REQUEST_4K_TV
-            : Permission.REQUEST_AUDIO_BOOK,
+          : Permission.REQUEST_4K_TV,
       ],
       { type: 'or' }
     ) &&
     ((settings.currentSettings.movie4kEnabled && mediaType === 'movie') ||
-      (settings.currentSettings.series4kEnabled && mediaType === 'tv') ||
-      (settings.currentSettings.bookAudioEnabled &&
-        mediaType === 'book' &&
-        !(
-          syncBookFormats && buttons.some((button) => button.id === 'request')
-        )))
+      (settings.currentSettings.series4kEnabled && mediaType === 'tv'))
   ) {
     buttons.push({
       id: 'request4k',
-      text: intl.formatMessage(
-        mediaType === 'book'
-          ? globalMessages.requestAudio
-          : globalMessages.request4k
-      ),
+      text: intl.formatMessage(globalMessages.request4k),
       action: () => {
         setEditRequest(false);
         setShowRequest4kModal(true);
@@ -446,6 +504,7 @@ const RequestButton = ({
               key={`request-option-${button.id}`}
               buttonType="primary"
               onClick={button.action}
+              disabled={isRequesting}
             >
               {button.svg}
               <span>{button.text}</span>

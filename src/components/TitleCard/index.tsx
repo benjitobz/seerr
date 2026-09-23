@@ -82,6 +82,7 @@ const TitleCard = ({
   const { user, hasPermission } = useUser();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
+  const [currentStatus4k, setCurrentStatus4k] = useState(status4k);
   const [showDetail, setShowDetail] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const { addToast } = useToasts();
@@ -99,10 +100,20 @@ const TitleCard = ({
     setCurrentStatus(status);
   }, [status]);
 
-  const requestComplete = useCallback((newStatus: MediaStatus) => {
-    setCurrentStatus(newStatus);
-    setShowRequestModal(false);
-  }, []);
+  useEffect(() => {
+    setCurrentStatus4k(status4k);
+  }, [status4k]);
+
+  const requestComplete = useCallback(
+    (newStatus: MediaStatus, newStatus4k?: MediaStatus) => {
+      setCurrentStatus(newStatus);
+      if (newStatus4k !== undefined) {
+        setCurrentStatus4k(newStatus4k);
+      }
+      setShowRequestModal(false);
+    },
+    []
+  );
 
   const requestUpdating = useCallback(
     (status: boolean) => setIsUpdating(status),
@@ -309,26 +320,39 @@ const TitleCard = ({
 
   const closeModal = useCallback(() => setShowRequestModal(false), []);
 
-  // The card always opens the ebook modal, which only covers audiobooks when
-  // format syncing is on
+  const canRequestFormat = (is4k: boolean) =>
+    is4k
+      ? settings.currentSettings.bookAudioEnabled &&
+        hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+          type: 'or',
+        })
+      : hasPermission([Permission.REQUEST, Permission.REQUEST_BOOK], {
+          type: 'or',
+        });
+
+  const isRequestableStatus = (mediaStatus?: MediaStatus) =>
+    !mediaStatus ||
+    mediaStatus === MediaStatus.UNKNOWN ||
+    mediaStatus === MediaStatus.DELETED;
+
   const showRequestButton =
-    hasPermission(
-      [
-        Permission.REQUEST,
-        mediaType === 'book'
-          ? Permission.REQUEST_BOOK
-          : mediaType === 'movie' || mediaType === 'collection'
-            ? Permission.REQUEST_MOVIE
-            : Permission.REQUEST_TV,
-      ],
-      { type: 'or' }
-    ) ||
-    (mediaType === 'book' &&
-      settings.currentSettings.syncBookFormatRequests &&
-      settings.currentSettings.bookAudioEnabled &&
-      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
-        type: 'or',
-      }));
+    mediaType === 'book'
+      ? canRequestFormat(false) || canRequestFormat(true)
+      : hasPermission(
+          [
+            Permission.REQUEST,
+            mediaType === 'movie' || mediaType === 'collection'
+              ? Permission.REQUEST_MOVIE
+              : Permission.REQUEST_TV,
+          ],
+          { type: 'or' }
+        );
+
+  const canRequestNow =
+    mediaType === 'book'
+      ? (canRequestFormat(false) && isRequestableStatus(currentStatus)) ||
+        (canRequestFormat(true) && isRequestableStatus(currentStatus4k))
+      : isRequestableStatus(currentStatus);
 
   const showHideButton = hasPermission([Permission.MANAGE_BLOCKLIST], {
     type: 'or',
@@ -363,19 +387,20 @@ const TitleCard = ({
     currentStatus === MediaStatus.PROCESSING &&
     !hasActiveRequest(false);
   const audiobookMissing =
-    status4k === MediaStatus.PROCESSING && !hasActiveRequest(true);
+    currentStatus4k === MediaStatus.PROCESSING && !hasActiveRequest(true);
 
   const ebookDisplayStatus =
     mediaType === 'book' &&
     showAudiobookStatus &&
     currentStatus === MediaStatus.AVAILABLE &&
-    !isAvailableStatus(status4k)
+    !isAvailableStatus(currentStatus4k)
       ? MediaStatus.PARTIALLY_AVAILABLE
       : currentStatus;
   const audiobookDisplayStatus =
-    status4k === MediaStatus.AVAILABLE && !isAvailableStatus(currentStatus)
+    currentStatus4k === MediaStatus.AVAILABLE &&
+    !isAvailableStatus(currentStatus)
       ? MediaStatus.PARTIALLY_AVAILABLE
-      : status4k;
+      : currentStatus4k;
 
   return (
     <div
@@ -551,8 +576,8 @@ const TitleCard = ({
               )}
             {((currentStatus && currentStatus !== MediaStatus.UNKNOWN) ||
               (showAudiobookStatus &&
-                status4k &&
-                status4k !== MediaStatus.UNKNOWN)) && (
+                currentStatus4k &&
+                currentStatus4k !== MediaStatus.UNKNOWN)) && (
               <div className="flex flex-col items-center gap-1">
                 {ebookDisplayStatus &&
                   ebookDisplayStatus !== MediaStatus.UNKNOWN && (
@@ -626,12 +651,7 @@ const TitleCard = ({
                 <div className="flex h-full w-full items-end">
                   <div
                     className={`px-2 text-white ${
-                      !showRequestButton ||
-                      (currentStatus &&
-                        currentStatus !== MediaStatus.UNKNOWN &&
-                        currentStatus !== MediaStatus.DELETED)
-                        ? 'pb-2'
-                        : 'pb-11'
+                      !showRequestButton || !canRequestNow ? 'pb-2' : 'pb-11'
                     }`}
                   >
                     {year && <div className="text-sm font-medium">{year}</div>}
@@ -653,12 +673,7 @@ const TitleCard = ({
                       className="whitespace-normal text-xs"
                       style={{
                         WebkitLineClamp:
-                          !showRequestButton ||
-                          (currentStatus &&
-                            currentStatus !== MediaStatus.UNKNOWN &&
-                            currentStatus !== MediaStatus.DELETED)
-                            ? 5
-                            : 3,
+                          !showRequestButton || !canRequestNow ? 5 : 3,
                         display: '-webkit-box',
                         overflow: 'hidden',
                         WebkitBoxOrient: 'vertical',
@@ -674,9 +689,7 @@ const TitleCard = ({
               <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 py-2">
                 {showRequestButton &&
                   (showDetail || (!position && !image)) &&
-                  (!currentStatus ||
-                    currentStatus === MediaStatus.UNKNOWN ||
-                    currentStatus === MediaStatus.DELETED) && (
+                  canRequestNow && (
                     <Button
                       buttonType="primary"
                       buttonSize="sm"
