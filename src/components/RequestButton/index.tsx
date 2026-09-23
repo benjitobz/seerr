@@ -2,11 +2,9 @@ import Button from '@app/components/Common/Button';
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import RequestModal from '@app/components/RequestModal';
 import useSettings from '@app/hooks/useSettings';
-import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { requestBookFormats } from '@app/utils/requestBookFormats';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import {
   CheckIcon,
@@ -28,12 +26,6 @@ const messages = defineMessages('components.RequestButton', {
   requestmore: 'Request More',
   requestmore4k: 'Request More in 4K',
   requestmoreaudiobook: 'Request More Audiobook',
-  requestebook: 'Request Ebook',
-  requestboth: 'Request Both',
-  ebookrequested: 'Ebook requested successfully!',
-  audiobookrequested: 'Audiobook requested successfully!',
-  bothformatsrequested: 'Ebook and audiobook requested successfully!',
-  requesterror: 'Something went wrong while submitting the request.',
   approverequest: 'Approve Request',
   approverequest4k: 'Approve 4K Request',
   approverequestaudiobook: 'Approve Audiobook Request',
@@ -80,8 +72,6 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
-  const [isRequesting, setIsRequesting] = useState(false);
-  const { addToast } = useToasts();
 
   // All pending requests
   const activeRequests = media?.requests.filter(
@@ -135,36 +125,6 @@ const RequestButton = ({
 
     onUpdate();
     mutate('/api/v1/request/count');
-  };
-
-  const requestBook = async (formats: boolean[]) => {
-    setIsRequesting(true);
-    const outcomes = await requestBookFormats(tmdbId, formats);
-    const requested = outcomes
-      .filter((outcome) => outcome.request)
-      .map((outcome) => outcome.is4k);
-
-    if (requested.length) {
-      addToast(
-        intl.formatMessage(
-          requested.length > 1
-            ? messages.bothformatsrequested
-            : requested[0]
-              ? messages.audiobookrequested
-              : messages.ebookrequested
-        ),
-        { appearance: 'success', autoDismiss: true }
-      );
-    }
-    if (requested.length < formats.length) {
-      addToast(intl.formatMessage(messages.requesterror), {
-        appearance: 'error',
-        autoDismiss: true,
-      });
-    }
-
-    onUpdate();
-    setIsRequesting(false);
   };
 
   const buttons: ButtonOption[] = [];
@@ -341,31 +301,14 @@ const RequestButton = ({
         media.status4k === MediaStatus.UNKNOWN ||
         (media.status4k === MediaStatus.DELETED && !active4kRequest));
 
-    if (ebookRequestable) {
+    if (ebookRequestable || audiobookRequestable) {
       buttons.push({
-        id: 'request-ebook',
-        text: intl.formatMessage(
-          settings.currentSettings.bookAudioEnabled
-            ? messages.requestebook
-            : globalMessages.request
-        ),
-        action: () => requestBook([false]),
-        svg: <ArrowDownTrayIcon />,
-      });
-    }
-    if (audiobookRequestable) {
-      buttons.push({
-        id: 'request-audiobook',
-        text: intl.formatMessage(globalMessages.requestAudio),
-        action: () => requestBook([true]),
-        svg: <ArrowDownTrayIcon />,
-      });
-    }
-    if (ebookRequestable && audiobookRequestable) {
-      buttons.push({
-        id: 'request-both',
-        text: intl.formatMessage(messages.requestboth),
-        action: () => requestBook([false, true]),
+        id: 'request',
+        text: intl.formatMessage(globalMessages.request),
+        action: () => {
+          setEditRequest(false);
+          setShowRequestModal(true);
+        },
         svg: <ArrowDownTrayIcon />,
       });
     }
@@ -504,7 +447,6 @@ const RequestButton = ({
               key={`request-option-${button.id}`}
               buttonType="primary"
               onClick={button.action}
-              disabled={isRequesting}
             >
               {button.svg}
               <span>{button.text}</span>
