@@ -11,27 +11,24 @@ export interface BookFormatRequestOutcome {
 export const requestBookFormats = async (
   mediaId: number,
   formats: boolean[],
-  overrides?: RequestOverrides | null,
-  overridesFor?: boolean
+  overridesFor?: (is4k: boolean) => RequestOverrides | undefined
 ): Promise<BookFormatRequestOutcome[]> => {
   const results = await Promise.allSettled(
-    formats.map((is4k) =>
-      axios.post<MediaRequest>('/api/v1/request', {
+    formats.map((is4k) => {
+      const overrides = overridesFor?.(is4k);
+
+      return axios.post<MediaRequest>('/api/v1/request', {
         mediaId,
         mediaType: 'book',
         is4k,
+        serverId: overrides?.server,
+        profileId: overrides?.profile,
+        metadataProfileId: overrides?.metadataProfile,
+        rootFolder: overrides?.folder,
         userId: overrides?.user?.id,
-        ...(overrides && is4k === overridesFor
-          ? {
-              serverId: overrides.server,
-              profileId: overrides.profile,
-              metadataProfileId: overrides.metadataProfile,
-              rootFolder: overrides.folder,
-              tags: overrides.tags,
-            }
-          : {}),
-      })
-    )
+        tags: overrides?.tags,
+      });
+    })
   );
 
   mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');

@@ -76,6 +76,9 @@ const BookRequestModal = ({
   const [selectedFormats, setSelectedFormats] = useState<boolean[] | null>(
     null
   );
+  const [formatOverrides, setFormatOverrides] = useState<
+    Record<string, RequestOverrides | undefined>
+  >({});
   const { addToast } = useToasts();
   const { data, error } = useSWR<BookDetails>(`/api/v1/book/${hcId}`, {
     revalidateOnMount: true,
@@ -84,12 +87,6 @@ const BookRequestModal = ({
   const intl = useIntl();
   const settings = useSettings();
   const { user, hasPermission } = useUser();
-  const { data: quota } = useSWR<QuotaResponse>(
-    user &&
-      (!requestOverrides?.user?.id || hasPermission(Permission.MANAGE_USERS))
-      ? `/api/v1/user/${requestOverrides?.user?.id ?? user.id}/quota`
-      : null
-  );
 
   useEffect(() => {
     if (onUpdating) {
@@ -131,27 +128,29 @@ const BookRequestModal = ({
     : requestableFormats.includes(isAudio)
       ? [isAudio]
       : requestableFormats.slice(0, 1);
-  const formats = selectedFormats ?? defaultFormats;
+  const formats = (selectedFormats ?? defaultFormats)
+    .slice()
+    .sort((a, b) => Number(a) - Number(b));
   const isAllSelected =
     requestableFormats.length > 0 &&
     requestableFormats.every((is4k) => formats.includes(is4k));
+  const overridesFor = (is4k: boolean) => formatOverrides[String(is4k)];
+  const overrideUser =
+    editRequest || formats.length === 0
+      ? requestOverrides?.user
+      : formats.map((is4k) => overridesFor(is4k)?.user).find((u) => u);
 
-  const advancedFormatFor = (selection: boolean[]) =>
-    selection.length === 1 ? selection[0] : false;
-  const advancedFormat = advancedFormatFor(formats);
-
-  const selectFormats = (selection: boolean[]) => {
-    if (advancedFormatFor(selection) !== advancedFormat) {
-      setRequestOverrides(null);
-    }
-    setSelectedFormats(selection);
-  };
+  const { data: quota } = useSWR<QuotaResponse>(
+    user && (!overrideUser?.id || hasPermission(Permission.MANAGE_USERS))
+      ? `/api/v1/user/${overrideUser?.id ?? user.id}/quota`
+      : null
+  );
 
   const toggleFormat = (is4k: boolean) => {
     if (!isRequestable(is4k)) {
       return;
     }
-    selectFormats(
+    setSelectedFormats(
       formats.includes(is4k)
         ? formats.filter((format) => format !== is4k)
         : [...formats, is4k]
@@ -159,7 +158,7 @@ const BookRequestModal = ({
   };
 
   const toggleAllFormats = () =>
-    selectFormats(isAllSelected ? [] : requestableFormats);
+    setSelectedFormats(isAllSelected ? [] : requestableFormats);
 
   const sendRequest = async () => {
     if (!data || formats.length === 0) {
@@ -168,12 +167,7 @@ const BookRequestModal = ({
     setIsUpdating(true);
 
     try {
-      const outcomes = await requestBookFormats(
-        data.id,
-        formats,
-        requestOverrides,
-        advancedFormat
-      );
+      const outcomes = await requestBookFormats(data.id, formats, overridesFor);
       const requested = outcomes.filter((outcome) => outcome.request);
 
       if (!requested.length) {
@@ -481,8 +475,8 @@ const BookRequestModal = ({
           mediaType="book"
           quota={quota?.book}
           userOverride={
-            requestOverrides?.user && requestOverrides.user.id !== user?.id
-              ? requestOverrides?.user?.id
+            overrideUser && overrideUser.id !== user?.id
+              ? overrideUser.id
               : undefined
           }
         />
@@ -552,16 +546,26 @@ const BookRequestModal = ({
         </div>
       </div>
       {(hasPermission(Permission.REQUEST_ADVANCED) ||
-        hasPermission(Permission.MANAGE_REQUESTS)) && (
-        <AdvancedRequester
-          key={`advanced-requester-${advancedFormat}`}
-          type={MediaType.BOOK}
-          is4k={advancedFormat}
-          onChange={(overrides) => {
-            setRequestOverrides(overrides);
-          }}
-        />
-      )}
+        hasPermission(Permission.MANAGE_REQUESTS)) &&
+        formats.map((is4k) => (
+          <div key={`advanced-requester-${is4k}`}>
+            {formats.length > 1 && (
+              <h3 className="mt-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                {intl.formatMessage(is4k ? messages.audiobook : messages.ebook)}
+              </h3>
+            )}
+            <AdvancedRequester
+              type={MediaType.BOOK}
+              is4k={is4k}
+              onChange={(overrides) => {
+                setFormatOverrides((current) => ({
+                  ...current,
+                  [String(is4k)]: overrides,
+                }));
+              }}
+            />
+          </div>
+        ))}
     </Modal>
   );
 };
