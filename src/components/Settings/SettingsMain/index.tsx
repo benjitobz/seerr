@@ -72,9 +72,9 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
   partialRequestsEnabled: 'Allow Partial Series Requests',
   enableSpecialEpisodes: 'Allow Special Episodes Requests',
-  syncBookFormatRequests: 'Sync Ebook and Audiobook Requests',
+  syncBookFormatRequests: 'Request Both Book Formats by Default',
   syncBookFormatRequestsTip:
-    'Requesting one format will also request the other',
+    'Pre-select the ebook and audiobook together when requesting a book',
   syncBookFormatRequestsDisabledTip:
     'A default Audiobook Readarr server must be configured to enable this setting',
   locale: 'Display Language',
