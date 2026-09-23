@@ -66,6 +66,7 @@ interface AdvancedRequesterProps {
   defaultOverrides?: RequestOverrides;
   requestUser?: User;
   quota?: { movie: { limit?: number }; tv: { limit?: number } };
+  hideTitle?: boolean;
   onChange: (overrides: RequestOverrides) => void;
 }
 
@@ -76,6 +77,7 @@ const AdvancedRequester = ({
   defaultOverrides,
   requestUser,
   quota,
+  hideTitle = false,
   onChange,
 }: AdvancedRequesterProps) => {
   const intl = useIntl();
@@ -384,9 +386,11 @@ const AdvancedRequester = ({
 
   return (
     <>
-      <div className="mb-2 mt-4 flex items-center text-lg font-semibold">
-        {intl.formatMessage(messages.advancedoptions)}
-      </div>
+      {!hideTitle && (
+        <div className="mb-2 mt-4 flex items-center text-lg font-semibold">
+          {intl.formatMessage(messages.advancedoptions)}
+        </div>
+      )}
       <div className="rounded-md">
         {!!data && selectedServer !== null && (
           <div className="flex flex-col md:flex-row">

@@ -547,25 +547,37 @@ const BookRequestModal = ({
       </div>
       {(hasPermission(Permission.REQUEST_ADVANCED) ||
         hasPermission(Permission.MANAGE_REQUESTS)) &&
-        formats.map((is4k) => (
-          <div key={`advanced-requester-${is4k}`}>
+        formats.length > 0 && (
+          <>
             {formats.length > 1 && (
-              <h3 className="mt-4 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                {intl.formatMessage(is4k ? messages.audiobook : messages.ebook)}
-              </h3>
+              <div className="mb-2 mt-4 flex items-center text-lg font-semibold">
+                {intl.formatMessage(globalMessages.advanced)}
+              </div>
             )}
-            <AdvancedRequester
-              type={MediaType.BOOK}
-              is4k={is4k}
-              onChange={(overrides) => {
-                setFormatOverrides((current) => ({
-                  ...current,
-                  [String(is4k)]: overrides,
-                }));
-              }}
-            />
-          </div>
-        ))}
+            {formats.map((is4k) => (
+              <div key={`advanced-requester-${is4k}`}>
+                {formats.length > 1 && (
+                  <h3 className="mt-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    {intl.formatMessage(
+                      is4k ? messages.audiobook : messages.ebook
+                    )}
+                  </h3>
+                )}
+                <AdvancedRequester
+                  type={MediaType.BOOK}
+                  is4k={is4k}
+                  hideTitle={formats.length > 1}
+                  onChange={(overrides) => {
+                    setFormatOverrides((current) => ({
+                      ...current,
+                      [String(is4k)]: overrides,
+                    }));
+                  }}
+                />
+              </div>
+            ))}
+          </>
+        )}
     </Modal>
   );
 };
