@@ -77,6 +77,9 @@ const messages = defineMessages('components.Settings.SettingsMain', {
     'Pre-select the ebook and audiobook together when requesting a book',
   syncBookFormatRequestsDisabledTip:
     'A default Audiobook Readarr server must be configured to enable this setting',
+  seriesRequestsEnabled: 'Allow Book Series Requests',
+  seriesRequestsEnabledTip:
+    'Allow every book in a series to be requested at once',
   locale: 'Display Language',
   youtubeUrl: 'YouTube URL',
   youtubeUrlTip:
@@ -193,6 +196,7 @@ const SettingsMain = () => {
             partialRequestsEnabled: data?.partialRequestsEnabled,
             enableSpecialEpisodes: data?.enableSpecialEpisodes,
             syncBookFormatRequests: data?.syncBookFormatRequests,
+            seriesRequestsEnabled: data?.seriesRequestsEnabled,
             cacheImages: data?.cacheImages,
             youtubeUrl: data?.youtubeUrl,
             versionCheck: data?.versionCheck,
@@ -218,6 +222,7 @@ const SettingsMain = () => {
                 partialRequestsEnabled: values.partialRequestsEnabled,
                 enableSpecialEpisodes: values.enableSpecialEpisodes,
                 syncBookFormatRequests: values.syncBookFormatRequests,
+                seriesRequestsEnabled: values.seriesRequestsEnabled,
                 cacheImages: values.cacheImages,
                 youtubeUrl: values.youtubeUrl,
                 versionCheck: values?.versionCheck,
@@ -648,6 +653,32 @@ const SettingsMain = () => {
                         setFieldValue(
                           'syncBookFormatRequests',
                           !values.syncBookFormatRequests
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <label
+                    htmlFor="seriesRequestsEnabled"
+                    className="checkbox-label"
+                  >
+                    <span className="mr-2">
+                      {intl.formatMessage(messages.seriesRequestsEnabled)}
+                    </span>
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.seriesRequestsEnabledTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      type="checkbox"
+                      id="seriesRequestsEnabled"
+                      name="seriesRequestsEnabled"
+                      onChange={() => {
+                        setFieldValue(
+                          'seriesRequestsEnabled',
+                          !values.seriesRequestsEnabled
                         );
                       }}
                     />

@@ -1,4 +1,4 @@
-import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
+import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import HardcoverSetup from '@app/components/Common/HardcoverSetup';
 import ImageFader from '@app/components/Common/ImageFader';
@@ -38,7 +38,6 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
   const settings = useSettings();
   const { hasPermission } = useUser();
   const [requestModal, setRequestModal] = useState(false);
-  const [isAudio, setIsAudio] = useState(false);
 
   const returnSeriesDownloadItems = (data: Series | undefined) => {
     const [downloadStatus, downloadStatus4k] = [
@@ -184,7 +183,6 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
         tmdbId={data.id}
         show={requestModal}
         type="series"
-        is4k={isAudio}
         onComplete={() => {
           revalidate();
           setRequestModal(false);
@@ -216,6 +214,8 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
               status={collectionStatus}
               downloadItem={downloadStatus}
               title={titles}
+              mediaType={MediaType.BOOK}
+              alwaysLabelFormat
               inProgress={data.books.some(
                 (book) => (book.mediaInfo?.downloadStatus ?? []).length > 0
               )}
@@ -233,6 +233,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                   title={titlesAudio}
                   is4k
                   mediaType={MediaType.BOOK}
+                  alwaysLabelFormat
                   inProgress={data.books.some(
                     (book) =>
                       (book.mediaInfo?.downloadStatus4k ?? []).length > 0
@@ -256,40 +257,16 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
-          {(hasRequestable || hasRequestableAudio) && (
-            <ButtonWithDropdown
-              buttonType="primary"
-              onClick={() => {
-                setRequestModal(true);
-                setIsAudio(!hasRequestable);
-              }}
-              text={
-                <>
-                  <ArrowDownTrayIcon />
-                  <span>
-                    {intl.formatMessage(
-                      hasRequestable
-                        ? messages.requestseries
-                        : messages.requestseriesaudio
-                    )}
-                  </span>
-                </>
-              }
-            >
-              {hasRequestable && hasRequestableAudio && (
-                <ButtonWithDropdown.Item
-                  buttonType="primary"
-                  onClick={() => {
-                    setRequestModal(true);
-                    setIsAudio(true);
-                  }}
-                >
-                  <ArrowDownTrayIcon />
-                  <span>{intl.formatMessage(messages.requestseriesaudio)}</span>
-                </ButtonWithDropdown.Item>
-              )}
-            </ButtonWithDropdown>
-          )}
+          {settings.currentSettings.seriesRequestsEnabled &&
+            (hasRequestable || hasRequestableAudio) && (
+              <Button
+                buttonType="primary"
+                onClick={() => setRequestModal(true)}
+              >
+                <ArrowDownTrayIcon />
+                <span>{intl.formatMessage(globalMessages.request)}</span>
+              </Button>
+            )}
         </div>
       </div>
       {data.overview && (
@@ -319,6 +296,8 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                 position={book.position}
                 mediaType={'book'}
                 status={book.mediaInfo?.status}
+                status4k={book.mediaInfo?.status4k}
+                mediaRequests={book.mediaInfo?.requests}
                 canExpand
               />
             </li>

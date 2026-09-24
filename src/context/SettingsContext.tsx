@@ -26,6 +26,7 @@ const defaultSettings = {
   partialRequestsEnabled: true,
   enableSpecialEpisodes: false,
   syncBookFormatRequests: false,
+  seriesRequestsEnabled: true,
   cacheImages: false,
   vapidPublic: '',
   enablePushRegistration: false,

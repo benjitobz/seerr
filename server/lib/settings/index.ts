@@ -162,6 +162,7 @@ export interface MainSettings {
   partialRequestsEnabled: boolean;
   enableSpecialEpisodes: boolean;
   syncBookFormatRequests: boolean;
+  seriesRequestsEnabled: boolean;
   locale: string;
   youtubeUrl: string;
   versionCheck: boolean;
@@ -217,6 +218,7 @@ interface FullPublicSettings extends PublicSettings {
   partialRequestsEnabled: boolean;
   enableSpecialEpisodes: boolean;
   syncBookFormatRequests: boolean;
+  seriesRequestsEnabled: boolean;
   cacheImages: boolean;
   vapidPublic: string;
   enablePushRegistration: boolean;
@@ -445,6 +447,7 @@ class Settings {
         partialRequestsEnabled: true,
         enableSpecialEpisodes: false,
         syncBookFormatRequests: false,
+        seriesRequestsEnabled: true,
         locale: 'en',
         youtubeUrl: '',
         versionCheck: true,
@@ -763,6 +766,7 @@ class Settings {
       partialRequestsEnabled: this.data.main.partialRequestsEnabled,
       enableSpecialEpisodes: this.data.main.enableSpecialEpisodes,
       syncBookFormatRequests: this.data.main.syncBookFormatRequests,
+      seriesRequestsEnabled: this.data.main.seriesRequestsEnabled,
       cacheImages: this.data.main.cacheImages,
       vapidPublic: this.vapidPublic,
       enablePushRegistration: this.data.notifications.agents.webpush.enabled,
