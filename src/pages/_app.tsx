@@ -256,6 +256,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     partialRequestsEnabled: true,
     enableSpecialEpisodes: false,
     syncBookFormatRequests: false,
+    seriesRequestsEnabled: true,
     cacheImages: false,
     vapidPublic: '',
     enablePushRegistration: false,

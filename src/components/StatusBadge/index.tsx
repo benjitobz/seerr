@@ -34,6 +34,9 @@ interface StatusBadgeProps {
   mediaType?: 'movie' | 'tv' | 'book';
   title?: string | string[];
   statusLabelOverride?: string;
+  // Books drop the format prefix when partially available, which only reads
+  // correctly where a sibling format is shown beside it
+  alwaysLabelFormat?: boolean;
 }
 
 const StatusBadge = ({
@@ -47,6 +50,7 @@ const StatusBadge = ({
   mediaType,
   title,
   statusLabelOverride,
+  alwaysLabelFormat = false,
 }: StatusBadgeProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
@@ -264,7 +268,11 @@ const StatusBadge = ({
               <span>
                 {intl.formatMessage(
                   mediaType === 'book'
-                    ? messages.status
+                    ? alwaysLabelFormat
+                      ? is4k
+                        ? messages.statusAudiobook
+                        : messages.statusEbook
+                      : messages.status
                     : is4k
                       ? messages.status4k
                       : messages.status,

@@ -104,6 +104,18 @@ const BookRequestModal = ({
           type: 'or',
         });
 
+  const autoApproves = (is4k: boolean) =>
+    hasPermission(
+      [
+        Permission.MANAGE_REQUESTS,
+        is4k ? Permission.AUTO_APPROVE_4K : Permission.AUTO_APPROVE,
+        is4k
+          ? Permission.AUTO_APPROVE_AUDIO_BOOK
+          : Permission.AUTO_APPROVE_BOOK,
+      ],
+      { type: 'or' }
+    );
+
   const formatStatus = (is4k: boolean) =>
     data?.mediaInfo?.[is4k ? 'status4k' : 'status'] ?? MediaStatus.UNKNOWN;
 
@@ -174,10 +186,14 @@ const BookRequestModal = ({
         throw new Error('No book format request succeeded');
       }
 
+      // The request response carries the media row as it was created, which is
+      // always pending; the approved-to-processing flip happens after it returns
       const statusAfter = (is4k: boolean) =>
-        requested.find((outcome) => outcome.is4k === is4k)?.request?.media[
-          is4k ? 'status4k' : 'status'
-        ] ?? formatStatus(is4k);
+        requested.some((outcome) => outcome.is4k === is4k)
+          ? autoApproves(is4k)
+            ? MediaStatus.PROCESSING
+            : MediaStatus.PENDING
+          : formatStatus(is4k);
 
       if (onComplete) {
         onComplete(statusAfter(false), statusAfter(true));
@@ -366,19 +382,7 @@ const BookRequestModal = ({
   }
 
   const hasAutoApprove =
-    formats.length > 0 &&
-    formats.every((is4k) =>
-      hasPermission(
-        [
-          Permission.MANAGE_REQUESTS,
-          is4k ? Permission.AUTO_APPROVE_4K : Permission.AUTO_APPROVE,
-          is4k
-            ? Permission.AUTO_APPROVE_AUDIO_BOOK
-            : Permission.AUTO_APPROVE_BOOK,
-        ],
-        { type: 'or' }
-      )
-    );
+    formats.length > 0 && formats.every((is4k) => autoApproves(is4k));
 
   const formatBadge = (is4k: boolean) => {
     const status = formatStatus(is4k);
