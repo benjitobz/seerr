@@ -205,10 +205,14 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
         <div className="mt-2 sm:flex sm:justify-between">
           <div className="sm:flex">
             <div className="mr-6 flex items-center text-sm leading-5">
-              {request.is4k && (
+              {(request.is4k || request.type === 'book') && (
                 <span className="mr-1">
                   <Badge badgeType="warning">
-                    {request.type === 'book' ? 'Audiobook' : '4K'}
+                    {request.type === 'book'
+                      ? request.is4k
+                        ? 'Audiobook'
+                        : 'Ebook'
+                      : '4K'}
                   </Badge>
                 </span>
               )}
