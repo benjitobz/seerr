@@ -216,6 +216,8 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
               status={collectionStatus}
               downloadItem={downloadStatus}
               title={titles}
+              mediaType={MediaType.BOOK}
+              alwaysLabelFormat
               inProgress={data.books.some(
                 (book) => (book.mediaInfo?.downloadStatus ?? []).length > 0
               )}
@@ -233,6 +235,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                   title={titlesAudio}
                   is4k
                   mediaType={MediaType.BOOK}
+                  alwaysLabelFormat
                   inProgress={data.books.some(
                     (book) =>
                       (book.mediaInfo?.downloadStatus4k ?? []).length > 0
@@ -319,6 +322,8 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                 position={book.position}
                 mediaType={'book'}
                 status={book.mediaInfo?.status}
+                status4k={book.mediaInfo?.status4k}
+                mediaRequests={book.mediaInfo?.requests}
                 canExpand
               />
             </li>
