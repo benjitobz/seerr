@@ -43,6 +43,7 @@ export interface PublicSettingsResponse {
   partialRequestsEnabled: boolean;
   enableSpecialEpisodes: boolean;
   syncBookFormatRequests: boolean;
+  seriesRequestsEnabled: boolean;
   cacheImages: boolean;
   vapidPublic: string;
   enablePushRegistration: boolean;

@@ -2,24 +2,25 @@ import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import Modal from '@app/components/Common/Modal';
+import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import type { RequestOverrides } from '@app/components/RequestModal/AdvancedRequester';
 import AdvancedRequester from '@app/components/RequestModal/AdvancedRequester';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { requestBookFormats } from '@app/utils/requestBookFormats';
 import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import { Permission } from '@server/lib/permissions';
 import type { Series } from '@server/models/Series';
-import axios from 'axios';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 
@@ -27,159 +28,42 @@ const messages = defineMessages('components.RequestModal', {
   requestadmin: 'This request will be approved automatically.',
   requestSuccess: '<strong>{title}</strong> requested successfully!',
   requestseriestitle: 'Request Series',
-  requestseriesaudiotitle: 'Request Series in Audiobook',
   requesterror: 'Something went wrong while submitting the request.',
   selectbooks: 'Select Book(s)',
+  ebook: 'Ebook',
+  audiobook: 'Audiobook',
   requestbooks: 'Request {count} {count, plural, one {Book} other {Books}}',
-  requestbooksaudio:
-    'Request {count} {count, plural, one {Book} other {Books}} in Audiobook',
 });
+
+const FORMATS = [false, true];
 
 interface RequestModalProps extends React.HTMLAttributes<HTMLDivElement> {
   seriesId?: number;
-  isAudio?: boolean;
   onCancel?: () => void;
   onComplete?: (newStatus: MediaStatus) => void;
   onUpdating?: (isUpdating: boolean) => void;
 }
+
+const pairKey = (bookId: number, is4k: boolean) => `${bookId}|${is4k ? 1 : 0}`;
 
 const SeriesRequestModal = ({
   onCancel,
   onComplete,
   seriesId,
   onUpdating,
-  isAudio = false,
 }: RequestModalProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [requestOverrides, setRequestOverrides] =
-    useState<RequestOverrides | null>(null);
-  const [selectedParts, setSelectedParts] = useState<number[]>([]);
+  const [formatOverrides, setFormatOverrides] = useState<
+    Record<string, RequestOverrides | undefined>
+  >({});
+  const [selection, setSelection] = useState<string[] | null>(null);
   const { addToast } = useToasts();
   const { data, error } = useSWR<Series>(`/api/v1/series/${seriesId}`, {
     revalidateOnMount: true,
   });
   const intl = useIntl();
+  const settings = useSettings();
   const { user, hasPermission } = useUser();
-  const { data: quota } = useSWR<QuotaResponse>(
-    user &&
-      (!requestOverrides?.user?.id || hasPermission(Permission.MANAGE_USERS))
-      ? `/api/v1/user/${requestOverrides?.user?.id ?? user.id}/quota`
-      : null
-  );
-
-  const currentlyRemaining =
-    (quota?.book.remaining ?? 0) - selectedParts.length;
-
-  const getAllParts = (): number[] => {
-    return (data?.books ?? [])
-      .filter((book) => book.mediaInfo?.status !== MediaStatus.BLOCKLISTED)
-      .map((book) => book.id);
-  };
-
-  const getAllRequestedParts = (): number[] => {
-    const requestedParts = (data?.books ?? []).reduce(
-      (requestedParts, book) => {
-        return [
-          ...requestedParts,
-          ...(book.mediaInfo?.requests ?? [])
-            .filter(
-              (request) =>
-                request.is4k === isAudio &&
-                request.status !== MediaRequestStatus.DECLINED &&
-                request.status !== MediaRequestStatus.COMPLETED
-            )
-            .map((book) => book.id),
-        ];
-      },
-      [] as number[]
-    );
-
-    const availableParts = (data?.books ?? [])
-      .filter(
-        (book) =>
-          book.mediaInfo &&
-          (book.mediaInfo[isAudio ? 'status4k' : 'status'] ===
-            MediaStatus.AVAILABLE ||
-            book.mediaInfo[isAudio ? 'status4k' : 'status'] ===
-              MediaStatus.PROCESSING) &&
-          !requestedParts.includes(book.id)
-      )
-      .map((book) => book.id);
-
-    return [...requestedParts, ...availableParts];
-  };
-
-  const isSelectedPart = (bookId: number): boolean =>
-    selectedParts.includes(bookId);
-
-  const togglePart = (bookId: number): void => {
-    // If this part already has a pending request, don't allow it to be toggled
-    if (getAllRequestedParts().includes(bookId)) {
-      return;
-    }
-
-    // If there are no more remaining requests available, block toggle
-    if (
-      quota?.book.limit &&
-      currentlyRemaining <= 0 &&
-      !isSelectedPart(bookId)
-    ) {
-      return;
-    }
-
-    if (selectedParts.includes(bookId)) {
-      setSelectedParts((parts) => parts.filter((partId) => partId !== bookId));
-    } else {
-      setSelectedParts((parts) => [...parts, bookId]);
-    }
-  };
-
-  const unrequestedParts = getAllParts().filter(
-    (bookId) => !getAllRequestedParts().includes(bookId)
-  );
-
-  const toggleAllParts = (): void => {
-    // If the user has a quota and not enough requests for all parts, block toggleAllParts
-    if (
-      quota?.book.limit &&
-      (quota?.book.remaining ?? 0) < unrequestedParts.length
-    ) {
-      return;
-    }
-
-    if (
-      data &&
-      selectedParts.length >= 0 &&
-      selectedParts.length < unrequestedParts.length
-    ) {
-      setSelectedParts(unrequestedParts);
-    } else {
-      setSelectedParts([]);
-    }
-  };
-
-  const isAllParts = (): boolean => {
-    if (!data) {
-      return false;
-    }
-
-    return (
-      selectedParts.length ===
-      getAllParts().filter((book) => !getAllRequestedParts().includes(book))
-        .length
-    );
-  };
-
-  const getPartRequest = (bookId: number): MediaRequest | undefined => {
-    const book = (data?.books ?? []).find((book) => book.id === bookId);
-
-    return (book?.mediaInfo?.requests ?? []).find(
-      (request) =>
-        request.is4k === isAudio &&
-        request.status !== MediaRequestStatus.DECLINED &&
-        request.status !== MediaRequestStatus.COMPLETED
-    );
-  };
 
   useEffect(() => {
     if (onUpdating) {
@@ -187,41 +71,280 @@ const SeriesRequestModal = ({
     }
   }, [isUpdating, onUpdating]);
 
-  const sendRequest = useCallback(async () => {
+  const canRequestFormat = (is4k: boolean) =>
+    is4k
+      ? settings.currentSettings.bookAudioEnabled &&
+        hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+          type: 'or',
+        })
+      : hasPermission([Permission.REQUEST, Permission.REQUEST_BOOK], {
+          type: 'or',
+        });
+
+  const visibleFormats = FORMATS.filter(canRequestFormat);
+  const books = data?.books ?? [];
+
+  const bookStatus = (bookId: number, is4k: boolean) => {
+    const book = books.find((b) => b.id === bookId);
+    return (
+      book?.mediaInfo?.[is4k ? 'status4k' : 'status'] ?? MediaStatus.UNKNOWN
+    );
+  };
+
+  const bookRequest = (bookId: number, is4k: boolean) => {
+    const book = books.find((b) => b.id === bookId);
+    return (book?.mediaInfo?.requests ?? []).find(
+      (request) =>
+        request.is4k === is4k &&
+        request.status !== MediaRequestStatus.DECLINED &&
+        request.status !== MediaRequestStatus.FAILED &&
+        request.status !== MediaRequestStatus.COMPLETED
+    );
+  };
+
+  // A format of a book can be requested when nothing is tracking it yet
+  const isRequestable = (bookId: number, is4k: boolean) => {
+    const book = books.find((b) => b.id === bookId);
+    if (
+      !canRequestFormat(is4k) ||
+      book?.mediaInfo?.status === MediaStatus.BLOCKLISTED ||
+      bookRequest(bookId, is4k)
+    ) {
+      return false;
+    }
+    const status = bookStatus(bookId, is4k);
+    return status === MediaStatus.UNKNOWN || status === MediaStatus.DELETED;
+  };
+
+  const requestablePairs = books.flatMap((book) =>
+    visibleFormats
+      .filter((is4k) => isRequestable(book.id, is4k))
+      .map((is4k) => pairKey(book.id, is4k))
+  );
+
+  // Both formats are pre-selected only when the global default says so
+  const defaultFormats = settings.currentSettings.syncBookFormatRequests
+    ? visibleFormats
+    : visibleFormats.slice(0, 1);
+  const defaultSelection = books.flatMap((book) =>
+    defaultFormats
+      .filter((is4k) => isRequestable(book.id, is4k))
+      .map((is4k) => pairKey(book.id, is4k))
+  );
+
+  const selected = (selection ?? defaultSelection).filter((key) =>
+    requestablePairs.includes(key)
+  );
+  const isSelected = (bookId: number, is4k: boolean) =>
+    selected.includes(pairKey(bookId, is4k));
+
+  const selectedBookIds = [
+    ...new Set(selected.map((key) => Number(key.split('|')[0]))),
+  ];
+  const selectedFormats = visibleFormats.filter((is4k) =>
+    selected.some((key) => key.endsWith(`|${is4k ? 1 : 0}`))
+  );
+
+  const quotaUser =
+    selectedFormats
+      .map((is4k) => formatOverrides[String(is4k)]?.user)
+      .find((selectedUser) => selectedUser) ?? undefined;
+
+  const { data: quota } = useSWR<QuotaResponse>(
+    user && (!quotaUser?.id || hasPermission(Permission.MANAGE_USERS))
+      ? `/api/v1/user/${quotaUser?.id ?? user.id}/quota`
+      : null
+  );
+
+  // A book costs one unit however many of its formats are taken
+  const currentlyRemaining =
+    (quota?.book.remaining ?? 0) - selectedBookIds.length;
+
+  const wouldExceedQuota = (bookId: number) =>
+    !!quota?.book.limit &&
+    currentlyRemaining <= 0 &&
+    !selectedBookIds.includes(bookId);
+
+  const toggle = (bookId: number, is4k: boolean) => {
+    if (!isRequestable(bookId, is4k)) {
+      return;
+    }
+    const key = pairKey(bookId, is4k);
+    if (!selected.includes(key) && wouldExceedQuota(bookId)) {
+      return;
+    }
+    setSelection(
+      selected.includes(key)
+        ? selected.filter((entry) => entry !== key)
+        : [...selected, key]
+    );
+  };
+
+  const formatColumn = (is4k: boolean) =>
+    requestablePairs.filter((key) => key.endsWith(`|${is4k ? 1 : 0}`));
+
+  const isWholeColumn = (is4k: boolean) => {
+    const column = formatColumn(is4k);
+    return column.length > 0 && column.every((key) => selected.includes(key));
+  };
+
+  const toggleColumn = (is4k: boolean) => {
+    const column = formatColumn(is4k);
+    if (!column.length) {
+      return;
+    }
+    if (isWholeColumn(is4k)) {
+      setSelection(selected.filter((key) => !column.includes(key)));
+      return;
+    }
+    const booksAfter = new Set([
+      ...selectedBookIds,
+      ...column.map((key) => Number(key.split('|')[0])),
+    ]);
+    if (quota?.book.limit && booksAfter.size > (quota.book.remaining ?? 0)) {
+      return;
+    }
+    setSelection([...new Set([...selected, ...column])]);
+  };
+
+  const requestableFormatsFor = (bookId: number) =>
+    visibleFormats.filter((is4k) => isRequestable(bookId, is4k));
+
+  const defaultFormatsFor = (bookId: number) => {
+    const preferred = defaultFormats.filter((is4k) =>
+      isRequestable(bookId, is4k)
+    );
+    return preferred.length ? preferred : requestableFormatsFor(bookId);
+  };
+
+  const bookSelectable = (bookId: number) =>
+    requestableFormatsFor(bookId).length > 0;
+  const bookIncluded = (bookId: number) =>
+    selected.some((key) => key.startsWith(`${bookId}|`));
+
+  // The leading toggle clears a book outright, or restores it at the defaults
+  const toggleBook = (bookId: number) => {
+    if (!bookSelectable(bookId)) {
+      return;
+    }
+    if (bookIncluded(bookId)) {
+      setSelection(selected.filter((key) => !key.startsWith(`${bookId}|`)));
+      return;
+    }
+    if (wouldExceedQuota(bookId)) {
+      return;
+    }
+    setSelection([
+      ...new Set([
+        ...selected,
+        ...defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k)),
+      ]),
+    ]);
+  };
+
+  const selectableBooks = books
+    .filter((book) => bookSelectable(book.id))
+    .map((book) => book.id);
+  const allBooksIncluded =
+    selectableBooks.length > 0 && selectableBooks.every(bookIncluded);
+
+  const toggleAllBooks = () => {
+    if (allBooksIncluded) {
+      setSelection([]);
+      return;
+    }
+    if (
+      quota?.book.limit &&
+      selectableBooks.length > (quota.book.remaining ?? 0)
+    ) {
+      return;
+    }
+    setSelection([
+      ...new Set([
+        ...selected,
+        ...selectableBooks.flatMap((bookId) =>
+          defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k))
+        ),
+      ]),
+    ]);
+  };
+
+  const statusBadge = (bookId: number, is4k: boolean) => {
+    const status = bookStatus(bookId, is4k);
+    const request = bookRequest(bookId, is4k);
+
+    if (status === MediaStatus.AVAILABLE) {
+      return (
+        <Badge badgeType="success">
+          {intl.formatMessage(globalMessages.available)}
+        </Badge>
+      );
+    }
+    if (status === MediaStatus.PARTIALLY_AVAILABLE) {
+      return (
+        <Badge badgeType="success">
+          {intl.formatMessage(globalMessages.partiallyavailable)}
+        </Badge>
+      );
+    }
+    if (status === MediaStatus.BLOCKLISTED) {
+      return (
+        <Badge badgeType="danger">
+          {intl.formatMessage(globalMessages.blocklisted)}
+        </Badge>
+      );
+    }
+    if (
+      status === MediaStatus.PROCESSING ||
+      request?.status === MediaRequestStatus.APPROVED
+    ) {
+      return (
+        <Badge badgeType="primary">
+          {intl.formatMessage(globalMessages.requested)}
+        </Badge>
+      );
+    }
+    if (status === MediaStatus.PENDING || request) {
+      return (
+        <Badge badgeType="warning">
+          {intl.formatMessage(globalMessages.pending)}
+        </Badge>
+      );
+    }
+    return <Badge>{intl.formatMessage(globalMessages.notrequested)}</Badge>;
+  };
+
+  const sendRequest = async () => {
+    if (!selected.length) {
+      return;
+    }
     setIsUpdating(true);
 
     try {
-      let overrideParams = {};
-      if (requestOverrides) {
-        overrideParams = {
-          serverId: requestOverrides.server,
-          profileId: requestOverrides.profile,
-          rootFolder: requestOverrides.folder,
-          userId: requestOverrides.user?.id,
-          tags: requestOverrides.tags,
-        };
+      const outcomes = (
+        await Promise.all(
+          selectedBookIds.map((bookId) =>
+            requestBookFormats(
+              bookId,
+              visibleFormats.filter((is4k) => isSelected(bookId, is4k)),
+              (is4k) => formatOverrides[String(is4k)]
+            )
+          )
+        )
+      ).flat();
+
+      if (!outcomes.some((outcome) => outcome.request)) {
+        throw new Error('No book format request succeeded');
       }
 
-      await Promise.all(
-        (
-          data?.books.filter((book) => selectedParts.includes(book.id)) ?? []
-        ).map(async (book) => {
-          await axios.post<MediaRequest>('/api/v1/request', {
-            mediaId: book.id,
-            mediaType: MediaType.BOOK,
-            is4k: isAudio,
-            ...overrideParams,
-          });
-        })
-      );
+      mutate('/api/v1/request/count');
 
       if (onComplete) {
         onComplete(
-          selectedParts.length === (data?.books ?? []).length
+          selectedBookIds.length === books.length
             ? MediaStatus.UNKNOWN
             : MediaStatus.PARTIALLY_AVAILABLE
         );
-        mutate('/api/v1/request/count');
       }
 
       addToast(
@@ -241,27 +364,22 @@ const SeriesRequestModal = ({
     } finally {
       setIsUpdating(false);
     }
-  }, [
-    requestOverrides,
-    data?.books,
-    data?.name,
-    onComplete,
-    addToast,
-    intl,
-    selectedParts,
-    isAudio,
-  ]);
+  };
 
-  const hasAutoApprove = hasPermission(
-    [
-      Permission.MANAGE_REQUESTS,
-      isAudio ? Permission.AUTO_APPROVE_4K : Permission.AUTO_APPROVE,
-      isAudio
-        ? Permission.AUTO_APPROVE_AUDIO_BOOK
-        : Permission.AUTO_APPROVE_BOOK,
-    ],
-    { type: 'or' }
-  );
+  const hasAutoApprove =
+    selectedFormats.length > 0 &&
+    selectedFormats.every((is4k) =>
+      hasPermission(
+        [
+          Permission.MANAGE_REQUESTS,
+          is4k ? Permission.AUTO_APPROVE_4K : Permission.AUTO_APPROVE,
+          is4k
+            ? Permission.AUTO_APPROVE_AUDIO_BOOK
+            : Permission.AUTO_APPROVE_BOOK,
+        ],
+        { type: 'or' }
+      )
+    );
 
   const blocklistVisibility = hasPermission(
     [Permission.MANAGE_BLOCKLIST, Permission.VIEW_BLOCKLIST],
@@ -274,23 +392,18 @@ const SeriesRequestModal = ({
       backgroundClickable
       onCancel={onCancel}
       onOk={sendRequest}
-      title={intl.formatMessage(
-        isAudio ? messages.requestseriesaudiotitle : messages.requestseriestitle
-      )}
+      title={intl.formatMessage(messages.requestseriestitle)}
       subTitle={data?.name}
       okText={
         isUpdating
           ? intl.formatMessage(globalMessages.requesting)
-          : selectedParts.length === 0
+          : selectedBookIds.length === 0
             ? intl.formatMessage(messages.selectbooks)
-            : intl.formatMessage(
-                isAudio ? messages.requestbooksaudio : messages.requestbooks,
-                {
-                  count: selectedParts.length,
-                }
-              )
+            : intl.formatMessage(messages.requestbooks, {
+                count: selectedBookIds.length,
+              })
       }
-      okDisabled={selectedParts.length === 0}
+      okDisabled={isUpdating || selected.length === 0 || quota?.book.restricted}
       okButtonType={'primary'}
       backdrop={undefined}
     >
@@ -308,61 +421,64 @@ const SeriesRequestModal = ({
           quota={quota?.book}
           remaining={currentlyRemaining}
           userOverride={
-            requestOverrides?.user && requestOverrides.user.id !== user?.id
-              ? requestOverrides?.user?.id
-              : undefined
+            quotaUser && quotaUser.id !== user?.id ? quotaUser.id : undefined
           }
         />
       )}
       <div className="flex flex-col">
         <div className="-mx-4 sm:mx-0">
           <div className="inline-block min-w-full py-2 align-middle">
-            <div className="overflow-hidden border border-gray-700 backdrop-blur sm:rounded-lg">
+            <div className="overflow-hidden border border-gray-700 shadow backdrop-blur sm:rounded-lg">
               <table className="min-w-full">
                 <thead>
                   <tr>
-                    <th className="w-16 bg-gray-700 bg-opacity-80 px-4 py-3">
-                      <span
-                        role="checkbox"
-                        tabIndex={0}
-                        aria-checked={isAllParts()}
-                        onClick={() => toggleAllParts()}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === 'Space') {
-                            toggleAllParts();
-                          }
-                        }}
-                        className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center pt-2 focus:outline-none ${
-                          quota?.book.limit &&
-                          (quota.book.remaining ?? 0) < unrequestedParts.length
-                            ? 'opacity-50'
-                            : ''
-                        }`}
+                    <th className="w-16 bg-gray-700/80 px-4 py-3">
+                      <div
+                        className={
+                          selectableBooks.length
+                            ? ''
+                            : 'pointer-events-none opacity-50'
+                        }
                       >
-                        <span
-                          aria-hidden="true"
-                          className={`${
-                            isAllParts() ? 'bg-indigo-500' : 'bg-gray-800'
-                          } absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out`}
+                        <SlideCheckbox
+                          checked={allBooksIncluded}
+                          onClick={toggleAllBooks}
                         />
-                        <span
-                          aria-hidden="true"
-                          className={`${
-                            isAllParts() ? 'translate-x-5' : 'translate-x-0'
-                          } absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out group-focus:border-blue-300 group-focus:ring`}
-                        />
-                      </span>
+                      </div>
                     </th>
-                    <th className="bg-gray-700 bg-opacity-80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
+                    <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
                       {intl.formatMessage(globalMessages.book)}
                     </th>
-                    <th className="bg-gray-700 bg-opacity-80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      {intl.formatMessage(globalMessages.status)}
-                    </th>
+                    {visibleFormats.map((is4k) => (
+                      <th
+                        key={`series-format-head-${is4k}`}
+                        className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-4"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={
+                              formatColumn(is4k).length
+                                ? ''
+                                : 'pointer-events-none opacity-50'
+                            }
+                          >
+                            <SlideCheckbox
+                              checked={isWholeColumn(is4k)}
+                              onClick={() => toggleColumn(is4k)}
+                            />
+                          </div>
+                          <span>
+                            {intl.formatMessage(
+                              is4k ? messages.audiobook : messages.ebook
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {data?.books
+                  {books
                     .filter((book) => {
                       if (!blocklistVisibility)
                         return (
@@ -370,92 +486,31 @@ const SeriesRequestModal = ({
                         );
                       return book;
                     })
-                    .map((book) => {
-                      const partRequest = getPartRequest(book.id);
-                      const partMedia =
-                        book.mediaInfo &&
-                        book.mediaInfo[isAudio ? 'status4k' : 'status'] !==
-                          MediaStatus.UNKNOWN &&
-                        book.mediaInfo[isAudio ? 'status4k' : 'status'] !==
-                          MediaStatus.DELETED
-                          ? book.mediaInfo
-                          : undefined;
-
-                      return (
-                        <tr key={`book-${book.id}`}>
-                          <td
-                            className={`whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100 ${
-                              partMedia?.status === MediaStatus.BLOCKLISTED &&
-                              'pointer-events-none opacity-50'
-                            }`}
+                    .map((book) => (
+                      <tr key={`book-${book.id}`}>
+                        <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
+                          <div
+                            className={
+                              bookSelectable(book.id)
+                                ? ''
+                                : 'pointer-events-none opacity-50'
+                            }
                           >
-                            <span
-                              role="checkbox"
-                              tabIndex={0}
-                              aria-checked={
-                                (!!partMedia &&
-                                  partMedia.status !==
-                                    MediaStatus.BLOCKLISTED) ||
-                                isSelectedPart(book.id)
+                            <SlideCheckbox
+                              checked={
+                                bookIncluded(book.id) ||
+                                !bookSelectable(book.id)
                               }
-                              onClick={() => togglePart(book.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === 'Space') {
-                                  togglePart(book.id);
-                                }
-                              }}
-                              className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center pt-2 focus:outline-none ${
-                                (!!partMedia &&
-                                  partMedia.status !==
-                                    MediaStatus.BLOCKLISTED) ||
-                                partRequest ||
-                                (quota?.book.limit &&
-                                  currentlyRemaining <= 0 &&
-                                  !isSelectedPart(book.id))
-                                  ? 'opacity-50'
-                                  : ''
-                              }`}
-                            >
-                              <span
-                                aria-hidden="true"
-                                className={`${
-                                  (!!partMedia &&
-                                    partMedia.status !==
-                                      MediaStatus.BLOCKLISTED) ||
-                                  partRequest ||
-                                  isSelectedPart(book.id)
-                                    ? 'bg-indigo-500'
-                                    : 'bg-gray-700'
-                                } absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out`}
-                              />
-                              <span
-                                aria-hidden="true"
-                                className={`${
-                                  (!!partMedia &&
-                                    partMedia.status !==
-                                      MediaStatus.BLOCKLISTED) ||
-                                  partRequest ||
-                                  isSelectedPart(book.id)
-                                    ? 'translate-x-5'
-                                    : 'translate-x-0'
-                                } absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out group-focus:border-blue-300 group-focus:ring`}
-                              />
-                            </span>
-                          </td>
-                          <td
-                            className={`flex items-center px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6 ${
-                              partMedia?.status === MediaStatus.BLOCKLISTED &&
-                              'pointer-events-none opacity-50'
-                            }`}
-                          >
-                            <div className="relative h-auto w-10 flex-shrink-0 overflow-hidden rounded-md">
+                              onClick={() => toggleBook(book.id)}
+                            />
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
+                          <div className="flex">
+                            <div className="w-10 flex-shrink-0">
                               <CachedImage
                                 type="hardcover"
-                                src={
-                                  book.posterPath
-                                    ? book.posterPath
-                                    : '/images/jellyseerr_poster_not_found.png'
-                                }
+                                src={book.posterPath ?? ''}
                                 alt=""
                                 sizes="100vw"
                                 style={{
@@ -476,46 +531,38 @@ const SeriesRequestModal = ({
                                 {book.title}
                               </div>
                             </div>
-                          </td>
-                          <td className="whitespace-nowrap py-4 pr-2 text-sm leading-5 text-gray-200 md:px-6">
-                            {!partMedia && !partRequest && (
-                              <Badge>
-                                {intl.formatMessage(
-                                  globalMessages.notrequested
-                                )}
-                              </Badge>
-                            )}
-                            {!partMedia &&
-                              partRequest?.status ===
-                                MediaRequestStatus.PENDING && (
-                                <Badge badgeType="warning">
-                                  {intl.formatMessage(globalMessages.pending)}
-                                </Badge>
-                              )}
-                            {((!partMedia &&
-                              partRequest?.status ===
-                                MediaRequestStatus.APPROVED) ||
-                              partMedia?.[isAudio ? 'status4k' : 'status'] ===
-                                MediaStatus.PROCESSING) && (
-                              <Badge badgeType="primary">
-                                {intl.formatMessage(globalMessages.requested)}
-                              </Badge>
-                            )}
-                            {partMedia?.[isAudio ? 'status4k' : 'status'] ===
-                              MediaStatus.AVAILABLE && (
-                              <Badge badgeType="success">
-                                {intl.formatMessage(globalMessages.available)}
-                              </Badge>
-                            )}
-                            {partMedia?.status === MediaStatus.BLOCKLISTED && (
-                              <Badge badgeType="danger">
-                                {intl.formatMessage(globalMessages.blocklisted)}
-                              </Badge>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                          </div>
+                        </td>
+                        {visibleFormats.map((is4k) => {
+                          const selectable = isRequestable(book.id, is4k);
+
+                          return (
+                            <td
+                              key={`book-${book.id}-format-${is4k}`}
+                              className="whitespace-nowrap px-2 py-4 text-sm leading-5 text-gray-200 md:px-4"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={
+                                    selectable
+                                      ? ''
+                                      : 'pointer-events-none opacity-50'
+                                  }
+                                >
+                                  <SlideCheckbox
+                                    checked={
+                                      isSelected(book.id, is4k) || !selectable
+                                    }
+                                    onClick={() => toggle(book.id, is4k)}
+                                  />
+                                </div>
+                                {statusBadge(book.id, is4k)}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -523,15 +570,38 @@ const SeriesRequestModal = ({
         </div>
       </div>
       {(hasPermission(Permission.REQUEST_ADVANCED) ||
-        hasPermission(Permission.MANAGE_REQUESTS)) && (
-        <AdvancedRequester
-          type={MediaType.BOOK}
-          is4k={isAudio}
-          onChange={(overrides) => {
-            setRequestOverrides(overrides);
-          }}
-        />
-      )}
+        hasPermission(Permission.MANAGE_REQUESTS)) &&
+        selectedFormats.length > 0 && (
+          <>
+            {selectedFormats.length > 1 && (
+              <div className="mb-2 mt-4 flex items-center text-lg font-semibold">
+                {intl.formatMessage(globalMessages.advanced)}
+              </div>
+            )}
+            {selectedFormats.map((is4k) => (
+              <div key={`advanced-requester-${is4k}`}>
+                {selectedFormats.length > 1 && (
+                  <h3 className="mt-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    {intl.formatMessage(
+                      is4k ? messages.audiobook : messages.ebook
+                    )}
+                  </h3>
+                )}
+                <AdvancedRequester
+                  type={MediaType.BOOK}
+                  is4k={is4k}
+                  hideTitle={selectedFormats.length > 1}
+                  onChange={(overrides) => {
+                    setFormatOverrides((current) => ({
+                      ...current,
+                      [String(is4k)]: overrides,
+                    }));
+                  }}
+                />
+              </div>
+            ))}
+          </>
+        )}
     </Modal>
   );
 };
