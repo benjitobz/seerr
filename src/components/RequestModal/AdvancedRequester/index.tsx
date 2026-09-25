@@ -55,6 +55,9 @@ const messages = defineMessages('components.RequestModal.AdvancedRequester', {
     "This request will not count against the user's quota limits. Use with caution.",
 });
 
+// Readarr recreates this profile on every start; it rejects every book
+const NONE_METADATA_PROFILE = 'None';
+
 export type RequestOverrides = {
   server?: number;
   profile?: number;
@@ -153,6 +156,9 @@ const AdvancedRequester = ({
         revalidateOnFocus: false,
       }
     );
+  const metadataProfiles = (serverData?.metadataProfiles ?? []).filter(
+    (metadataProfile) => metadataProfile.name !== NONE_METADATA_PROFILE
+  );
 
   const [selectedUser, setSelectedUser] = useState<User | null>(
     requestUser ?? null
@@ -247,7 +253,7 @@ const AdvancedRequester = ({
             ? serverData.server.activeAnimeLanguageProfileId
             : serverData.server.activeLanguageProfileId)
       );
-      const defaultMetadataProfile = serverData.metadataProfiles?.find(
+      const defaultMetadataProfile = metadataProfiles.find(
         (metadataProfile) =>
           metadataProfile.id === serverData.server.activeMetadataProfileId
       );
@@ -461,7 +467,7 @@ const AdvancedRequester = ({
           (serverData.profiles.length < 2 &&
             serverData.rootFolders.length < 2 &&
             (serverData.languageProfiles ?? []).length < 2 &&
-            (serverData.metadataProfiles ?? []).length < 2 &&
+            metadataProfiles.length < 2 &&
             !serverData.tags?.length)))) &&
     (!selectedUser || (filteredUserData ?? []).length < 2)
   ) {
@@ -558,10 +564,7 @@ const AdvancedRequester = ({
               </div>
             )}
             {type === 'book' &&
-              (isValidating ||
-                !serverData ||
-                (serverData.metadataProfiles &&
-                  serverData.metadataProfiles.length > 1)) && (
+              (isValidating || !serverData || metadataProfiles.length > 1) && (
                 <div className="mb-3 w-full flex-shrink-0 flex-grow last:pr-0 md:w-1/4 md:pr-4">
                   <label htmlFor="metadataProfile">
                     {intl.formatMessage(messages.metadataprofile)}
@@ -586,8 +589,7 @@ const AdvancedRequester = ({
                     )}
                     {!isValidating &&
                       serverData &&
-                      serverData.metadataProfiles &&
-                      serverData.metadataProfiles.map((metadataProfile) => (
+                      metadataProfiles.map((metadataProfile) => (
                         <option
                           key={`metadata-profile-list${metadataProfile.id}`}
                           value={metadataProfile.id}
