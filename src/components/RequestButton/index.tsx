@@ -26,7 +26,6 @@ const messages = defineMessages('components.RequestButton', {
   requestmore: 'Request More',
   requestmore4k: 'Request More in 4K',
   requestmoreaudiobook: 'Request More Audiobook',
-  requestebook: 'Request eBook',
   approverequest: 'Approve Request',
   approverequest4k: 'Approve 4K Request',
   approverequestaudiobook: 'Approve Audiobook Request',
@@ -73,13 +72,6 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
-
-  // A synced book request is submitted from the ebook modal, so the separate
-  // audiobook button would duplicate it
-  const syncBookFormats =
-    mediaType === 'book' &&
-    settings.currentSettings.syncBookFormatRequests &&
-    settings.currentSettings.bookAudioEnabled;
 
   // All pending requests
   const activeRequests = media?.requests.filter(
@@ -292,36 +284,55 @@ const RequestButton = ({
     }
   }
 
+  if (mediaType === 'book') {
+    const ebookRequestable =
+      hasPermission([Permission.REQUEST, Permission.REQUEST_BOOK], {
+        type: 'or',
+      }) &&
+      (!media ||
+        media.status === MediaStatus.UNKNOWN ||
+        (media.status === MediaStatus.DELETED && !activeRequest));
+    const audiobookRequestable =
+      settings.currentSettings.bookAudioEnabled &&
+      hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
+        type: 'or',
+      }) &&
+      (!media ||
+        media.status4k === MediaStatus.UNKNOWN ||
+        (media.status4k === MediaStatus.DELETED && !active4kRequest));
+
+    if (ebookRequestable || audiobookRequestable) {
+      buttons.push({
+        id: 'request',
+        text: intl.formatMessage(globalMessages.request),
+        action: () => {
+          setEditRequest(false);
+          setShowRequestModal(true);
+        },
+        svg: <ArrowDownTrayIcon />,
+      });
+    }
+  }
+
   // Standard request button
   if (
+    mediaType !== 'book' &&
     (!media ||
       media.status === MediaStatus.UNKNOWN ||
       (media.status === MediaStatus.DELETED && !activeRequest)) &&
-    (hasPermission(
+    hasPermission(
       [
         Permission.REQUEST,
         mediaType === 'movie'
           ? Permission.REQUEST_MOVIE
-          : mediaType === 'tv'
-            ? Permission.REQUEST_TV
-            : Permission.REQUEST_BOOK,
+          : Permission.REQUEST_TV,
       ],
       { type: 'or' }
-    ) ||
-      (syncBookFormats &&
-        hasPermission([Permission.REQUEST_4K, Permission.REQUEST_AUDIO_BOOK], {
-          type: 'or',
-        })))
+    )
   ) {
     buttons.push({
       id: 'request',
-      text: intl.formatMessage(
-        mediaType === 'book' &&
-          !syncBookFormats &&
-          settings.currentSettings.bookAudioEnabled
-          ? messages.requestebook
-          : globalMessages.request
-      ),
+      text: intl.formatMessage(globalMessages.request),
       action: () => {
         setEditRequest(false);
         setShowRequestModal(true);
@@ -351,6 +362,7 @@ const RequestButton = ({
 
   // 4K request button
   if (
+    mediaType !== 'book' &&
     (!media ||
       media.status4k === MediaStatus.UNKNOWN ||
       (media.status4k === MediaStatus.DELETED && !active4kRequest)) &&
@@ -359,27 +371,16 @@ const RequestButton = ({
         Permission.REQUEST_4K,
         mediaType === 'movie'
           ? Permission.REQUEST_4K_MOVIE
-          : mediaType === 'tv'
-            ? Permission.REQUEST_4K_TV
-            : Permission.REQUEST_AUDIO_BOOK,
+          : Permission.REQUEST_4K_TV,
       ],
       { type: 'or' }
     ) &&
     ((settings.currentSettings.movie4kEnabled && mediaType === 'movie') ||
-      (settings.currentSettings.series4kEnabled && mediaType === 'tv') ||
-      (settings.currentSettings.bookAudioEnabled &&
-        mediaType === 'book' &&
-        !(
-          syncBookFormats && buttons.some((button) => button.id === 'request')
-        )))
+      (settings.currentSettings.series4kEnabled && mediaType === 'tv'))
   ) {
     buttons.push({
       id: 'request4k',
-      text: intl.formatMessage(
-        mediaType === 'book'
-          ? globalMessages.requestAudio
-          : globalMessages.request4k
-      ),
+      text: intl.formatMessage(globalMessages.request4k),
       action: () => {
         setEditRequest(false);
         setShowRequest4kModal(true);
