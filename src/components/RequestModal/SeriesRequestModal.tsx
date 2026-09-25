@@ -207,6 +207,68 @@ const SeriesRequestModal = ({
     setSelection([...new Set([...selected, ...column])]);
   };
 
+  const requestableFormatsFor = (bookId: number) =>
+    visibleFormats.filter((is4k) => isRequestable(bookId, is4k));
+
+  const defaultFormatsFor = (bookId: number) => {
+    const preferred = defaultFormats.filter((is4k) =>
+      isRequestable(bookId, is4k)
+    );
+    return preferred.length ? preferred : requestableFormatsFor(bookId);
+  };
+
+  const bookSelectable = (bookId: number) =>
+    requestableFormatsFor(bookId).length > 0;
+  const bookIncluded = (bookId: number) =>
+    selected.some((key) => key.startsWith(`${bookId}|`));
+
+  // The leading toggle clears a book outright, or restores it at the defaults
+  const toggleBook = (bookId: number) => {
+    if (!bookSelectable(bookId)) {
+      return;
+    }
+    if (bookIncluded(bookId)) {
+      setSelection(selected.filter((key) => !key.startsWith(`${bookId}|`)));
+      return;
+    }
+    if (wouldExceedQuota(bookId)) {
+      return;
+    }
+    setSelection([
+      ...new Set([
+        ...selected,
+        ...defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k)),
+      ]),
+    ]);
+  };
+
+  const selectableBooks = books
+    .filter((book) => bookSelectable(book.id))
+    .map((book) => book.id);
+  const allBooksIncluded =
+    selectableBooks.length > 0 && selectableBooks.every(bookIncluded);
+
+  const toggleAllBooks = () => {
+    if (allBooksIncluded) {
+      setSelection([]);
+      return;
+    }
+    if (
+      quota?.book.limit &&
+      selectableBooks.length > (quota.book.remaining ?? 0)
+    ) {
+      return;
+    }
+    setSelection([
+      ...new Set([
+        ...selected,
+        ...selectableBooks.flatMap((bookId) =>
+          defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k))
+        ),
+      ]),
+    ]);
+  };
+
   const statusBadge = (bookId: number, is4k: boolean) => {
     const status = bookStatus(bookId, is4k);
     const request = bookRequest(bookId, is4k);
@@ -370,6 +432,20 @@ const SeriesRequestModal = ({
               <table className="min-w-full">
                 <thead>
                   <tr>
+                    <th className="w-16 bg-gray-700/80 px-4 py-3">
+                      <div
+                        className={
+                          selectableBooks.length
+                            ? ''
+                            : 'pointer-events-none opacity-50'
+                        }
+                      >
+                        <SlideCheckbox
+                          checked={allBooksIncluded}
+                          onClick={toggleAllBooks}
+                        />
+                      </div>
+                    </th>
                     <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
                       {intl.formatMessage(globalMessages.book)}
                     </th>
@@ -412,6 +488,23 @@ const SeriesRequestModal = ({
                     })
                     .map((book) => (
                       <tr key={`book-${book.id}`}>
+                        <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
+                          <div
+                            className={
+                              bookSelectable(book.id)
+                                ? ''
+                                : 'pointer-events-none opacity-50'
+                            }
+                          >
+                            <SlideCheckbox
+                              checked={
+                                bookIncluded(book.id) ||
+                                !bookSelectable(book.id)
+                              }
+                              onClick={() => toggleBook(book.id)}
+                            />
+                          </div>
+                        </td>
                         <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
                           <div className="flex">
                             <div className="w-10 flex-shrink-0">
