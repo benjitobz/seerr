@@ -655,8 +655,6 @@
   "components.RequestModal.requestSuccess": "<strong>{title}</strong> requested successfully!",
   "components.RequestModal.requestadmin": "This request will be approved automatically.",
   "components.RequestModal.requestbooks": "Request {count} {count, plural, one {Book} other {Books}}",
-  "components.RequestModal.requestbooksaudio": "Request {count} {count, plural, one {Book} other {Books}} in Audiobook",
-  "components.RequestModal.requestbooksboth": "Request {count} {count, plural, one {Book} other {Books}} in Both Formats",
   "components.RequestModal.requestbooktitle": "Request Book",
   "components.RequestModal.requestbothformats": "Request Both Formats",
   "components.RequestModal.requestcancelled": "Request for <strong>{title}</strong> canceled.",
