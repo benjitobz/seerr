@@ -73,7 +73,6 @@ const RequestModal = ({
           onCancel={onCancel}
           seriesId={tmdbId}
           onUpdating={onUpdating}
-          isAudio={is4k}
         />
       ) : (
         <CollectionRequestModal
