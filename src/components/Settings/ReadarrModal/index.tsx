@@ -578,17 +578,18 @@ const ReadarrModal = ({ onClose, readarr, onSave }: ReadarrModalProps) => {
                                   messages.selectMetadataProfile
                                 )}
                         </option>
-                        {testResponse.metadataProfiles.length > 0 &&
-                          testResponse.metadataProfiles.map(
-                            (metadataProfile) => (
-                              <option
-                                key={`loaded-metadataProfile-${metadataProfile.id}`}
-                                value={metadataProfile.id}
-                              >
-                                {metadataProfile.name}
-                              </option>
-                            )
-                          )}
+                        {testResponse.metadataProfiles
+                          .filter(
+                            (metadataProfile) => metadataProfile.name !== 'None'
+                          )
+                          .map((metadataProfile) => (
+                            <option
+                              key={`loaded-metadataProfile-${metadataProfile.id}`}
+                              value={metadataProfile.id}
+                            >
+                              {metadataProfile.name}
+                            </option>
+                          ))}
                       </Field>
                     </div>
                     {errors.activeMetadataProfileId &&
