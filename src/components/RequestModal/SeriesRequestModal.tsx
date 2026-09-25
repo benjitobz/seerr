@@ -30,15 +30,9 @@ const messages = defineMessages('components.RequestModal', {
   requestseriestitle: 'Request Series',
   requesterror: 'Something went wrong while submitting the request.',
   selectbooks: 'Select Book(s)',
-  selectformat: 'Select Format(s)',
-  format: 'Format',
   ebook: 'Ebook',
   audiobook: 'Audiobook',
   requestbooks: 'Request {count} {count, plural, one {Book} other {Books}}',
-  requestbooksaudio:
-    'Request {count} {count, plural, one {Book} other {Books}} in Audiobook',
-  requestbooksboth:
-    'Request {count} {count, plural, one {Book} other {Books}} in Both Formats',
 });
 
 const FORMATS = [false, true];
@@ -50,6 +44,8 @@ interface RequestModalProps extends React.HTMLAttributes<HTMLDivElement> {
   onUpdating?: (isUpdating: boolean) => void;
 }
 
+const pairKey = (bookId: number, is4k: boolean) => `${bookId}|${is4k ? 1 : 0}`;
+
 const SeriesRequestModal = ({
   onCancel,
   onComplete,
@@ -60,10 +56,7 @@ const SeriesRequestModal = ({
   const [formatOverrides, setFormatOverrides] = useState<
     Record<string, RequestOverrides | undefined>
   >({});
-  const [selectedFormats, setSelectedFormats] = useState<boolean[] | null>(
-    null
-  );
-  const [selectedParts, setSelectedParts] = useState<number[] | null>(null);
+  const [selection, setSelection] = useState<string[] | null>(null);
   const { addToast } = useToasts();
   const { data, error } = useSWR<Series>(`/api/v1/series/${seriesId}`, {
     revalidateOnMount: true,
@@ -89,15 +82,6 @@ const SeriesRequestModal = ({
         });
 
   const visibleFormats = FORMATS.filter(canRequestFormat);
-  const formats = (
-    selectedFormats ??
-    (settings.currentSettings.syncBookFormatRequests
-      ? visibleFormats
-      : visibleFormats.slice(0, 1))
-  )
-    .slice()
-    .sort((a, b) => Number(a) - Number(b));
-
   const books = data?.books ?? [];
 
   const bookStatus = (bookId: number, is4k: boolean) => {
@@ -119,30 +103,52 @@ const SeriesRequestModal = ({
   };
 
   // A format of a book can be requested when nothing is tracking it yet
-  const isBookFormatRequestable = (bookId: number, is4k: boolean) => {
-    if (!canRequestFormat(is4k) || bookRequest(bookId, is4k)) {
+  const isRequestable = (bookId: number, is4k: boolean) => {
+    const book = books.find((b) => b.id === bookId);
+    if (
+      !canRequestFormat(is4k) ||
+      book?.mediaInfo?.status === MediaStatus.BLOCKLISTED ||
+      bookRequest(bookId, is4k)
+    ) {
       return false;
     }
     const status = bookStatus(bookId, is4k);
     return status === MediaStatus.UNKNOWN || status === MediaStatus.DELETED;
   };
 
-  const formatsForBook = (bookId: number) =>
-    formats.filter((is4k) => isBookFormatRequestable(bookId, is4k));
+  const requestablePairs = books.flatMap((book) =>
+    visibleFormats
+      .filter((is4k) => isRequestable(book.id, is4k))
+      .map((is4k) => pairKey(book.id, is4k))
+  );
 
-  const requestableBooks = books
-    .filter((book) => book.mediaInfo?.status !== MediaStatus.BLOCKLISTED)
-    .filter((book) => formatsForBook(book.id).length > 0)
-    .map((book) => book.id);
+  // Both formats are pre-selected only when the global default says so
+  const defaultFormats = settings.currentSettings.syncBookFormatRequests
+    ? visibleFormats
+    : visibleFormats.slice(0, 1);
+  const defaultSelection = books.flatMap((book) =>
+    defaultFormats
+      .filter((is4k) => isRequestable(book.id, is4k))
+      .map((is4k) => pairKey(book.id, is4k))
+  );
 
-  const parts = (selectedParts ?? requestableBooks).filter((bookId) =>
-    requestableBooks.includes(bookId)
+  const selected = (selection ?? defaultSelection).filter((key) =>
+    requestablePairs.includes(key)
+  );
+  const isSelected = (bookId: number, is4k: boolean) =>
+    selected.includes(pairKey(bookId, is4k));
+
+  const selectedBookIds = [
+    ...new Set(selected.map((key) => Number(key.split('|')[0]))),
+  ];
+  const selectedFormats = visibleFormats.filter((is4k) =>
+    selected.some((key) => key.endsWith(`|${is4k ? 1 : 0}`))
   );
 
   const quotaUser =
-    formats
+    selectedFormats
       .map((is4k) => formatOverrides[String(is4k)]?.user)
-      .find((selected) => selected) ?? undefined;
+      .find((selectedUser) => selectedUser) ?? undefined;
 
   const { data: quota } = useSWR<QuotaResponse>(
     user && (!quotaUser?.id || hasPermission(Permission.MANAGE_USERS))
@@ -150,69 +156,61 @@ const SeriesRequestModal = ({
       : null
   );
 
-  // One book counts once against the book quota however many formats it takes
-  const currentlyRemaining = (quota?.book.remaining ?? 0) - parts.length;
-  const isAllParts =
-    requestableBooks.length > 0 && parts.length === requestableBooks.length;
-  const isAllFormats =
-    visibleFormats.length > 0 &&
-    visibleFormats.every((is4k) => formats.includes(is4k));
+  // A book costs one unit however many of its formats are taken
+  const currentlyRemaining =
+    (quota?.book.remaining ?? 0) - selectedBookIds.length;
 
-  const toggleFormat = (is4k: boolean) =>
-    setSelectedFormats(
-      formats.includes(is4k)
-        ? formats.filter((format) => format !== is4k)
-        : [...formats, is4k]
-    );
+  const wouldExceedQuota = (bookId: number) =>
+    !!quota?.book.limit &&
+    currentlyRemaining <= 0 &&
+    !selectedBookIds.includes(bookId);
 
-  const toggleAllFormats = () =>
-    setSelectedFormats(isAllFormats ? [] : visibleFormats);
-
-  const togglePart = (bookId: number) => {
-    if (!requestableBooks.includes(bookId)) {
+  const toggle = (bookId: number, is4k: boolean) => {
+    if (!isRequestable(bookId, is4k)) {
       return;
     }
-    if (
-      quota?.book.limit &&
-      currentlyRemaining <= 0 &&
-      !parts.includes(bookId)
-    ) {
+    const key = pairKey(bookId, is4k);
+    if (!selected.includes(key) && wouldExceedQuota(bookId)) {
       return;
     }
-    setSelectedParts(
-      parts.includes(bookId)
-        ? parts.filter((partId) => partId !== bookId)
-        : [...parts, bookId]
+    setSelection(
+      selected.includes(key)
+        ? selected.filter((entry) => entry !== key)
+        : [...selected, key]
     );
   };
 
-  const toggleAllParts = () => {
-    if (
-      quota?.book.limit &&
-      (quota?.book.remaining ?? 0) < requestableBooks.length
-    ) {
+  const formatColumn = (is4k: boolean) =>
+    requestablePairs.filter((key) => key.endsWith(`|${is4k ? 1 : 0}`));
+
+  const isWholeColumn = (is4k: boolean) => {
+    const column = formatColumn(is4k);
+    return column.length > 0 && column.every((key) => selected.includes(key));
+  };
+
+  const toggleColumn = (is4k: boolean) => {
+    const column = formatColumn(is4k);
+    if (!column.length) {
       return;
     }
-    setSelectedParts(isAllParts ? [] : requestableBooks);
+    if (isWholeColumn(is4k)) {
+      setSelection(selected.filter((key) => !column.includes(key)));
+      return;
+    }
+    const booksAfter = new Set([
+      ...selectedBookIds,
+      ...column.map((key) => Number(key.split('|')[0])),
+    ]);
+    if (quota?.book.limit && booksAfter.size > (quota.book.remaining ?? 0)) {
+      return;
+    }
+    setSelection([...new Set([...selected, ...column])]);
   };
 
-  const seriesFormatStatus = (is4k: boolean) => {
-    if (!books.length) {
-      return MediaStatus.UNKNOWN;
-    }
-    const key = is4k ? 'status4k' : 'status';
-    if (
-      books.every((book) => book.mediaInfo?.[key] === MediaStatus.AVAILABLE)
-    ) {
-      return MediaStatus.AVAILABLE;
-    }
-    if (books.some((book) => book.mediaInfo?.[key] === MediaStatus.AVAILABLE)) {
-      return MediaStatus.PARTIALLY_AVAILABLE;
-    }
-    return MediaStatus.UNKNOWN;
-  };
+  const statusBadge = (bookId: number, is4k: boolean) => {
+    const status = bookStatus(bookId, is4k);
+    const request = bookRequest(bookId, is4k);
 
-  const statusBadge = (status: MediaStatus, requested?: boolean) => {
     if (status === MediaStatus.AVAILABLE) {
       return (
         <Badge badgeType="success">
@@ -234,14 +232,17 @@ const SeriesRequestModal = ({
         </Badge>
       );
     }
-    if (status === MediaStatus.PROCESSING) {
+    if (
+      status === MediaStatus.PROCESSING ||
+      request?.status === MediaRequestStatus.APPROVED
+    ) {
       return (
         <Badge badgeType="primary">
           {intl.formatMessage(globalMessages.requested)}
         </Badge>
       );
     }
-    if (status === MediaStatus.PENDING || requested) {
+    if (status === MediaStatus.PENDING || request) {
       return (
         <Badge badgeType="warning">
           {intl.formatMessage(globalMessages.pending)}
@@ -252,7 +253,7 @@ const SeriesRequestModal = ({
   };
 
   const sendRequest = async () => {
-    if (!parts.length || !formats.length) {
+    if (!selected.length) {
       return;
     }
     setIsUpdating(true);
@@ -260,10 +261,10 @@ const SeriesRequestModal = ({
     try {
       const outcomes = (
         await Promise.all(
-          parts.map((bookId) =>
+          selectedBookIds.map((bookId) =>
             requestBookFormats(
               bookId,
-              formatsForBook(bookId),
+              visibleFormats.filter((is4k) => isSelected(bookId, is4k)),
               (is4k) => formatOverrides[String(is4k)]
             )
           )
@@ -278,7 +279,7 @@ const SeriesRequestModal = ({
 
       if (onComplete) {
         onComplete(
-          parts.length === books.length
+          selectedBookIds.length === books.length
             ? MediaStatus.UNKNOWN
             : MediaStatus.PARTIALLY_AVAILABLE
         );
@@ -304,8 +305,8 @@ const SeriesRequestModal = ({
   };
 
   const hasAutoApprove =
-    formats.length > 0 &&
-    formats.every((is4k) =>
+    selectedFormats.length > 0 &&
+    selectedFormats.every((is4k) =>
       hasPermission(
         [
           Permission.MANAGE_REQUESTS,
@@ -334,25 +335,13 @@ const SeriesRequestModal = ({
       okText={
         isUpdating
           ? intl.formatMessage(globalMessages.requesting)
-          : formats.length === 0
-            ? intl.formatMessage(messages.selectformat)
-            : parts.length === 0
-              ? intl.formatMessage(messages.selectbooks)
-              : intl.formatMessage(
-                  formats.length > 1
-                    ? messages.requestbooksboth
-                    : formats[0]
-                      ? messages.requestbooksaudio
-                      : messages.requestbooks,
-                  { count: parts.length }
-                )
+          : selectedBookIds.length === 0
+            ? intl.formatMessage(messages.selectbooks)
+            : intl.formatMessage(messages.requestbooks, {
+                count: selectedBookIds.length,
+              })
       }
-      okDisabled={
-        isUpdating ||
-        formats.length === 0 ||
-        parts.length === 0 ||
-        quota?.book.restricted
-      }
+      okDisabled={isUpdating || selected.length === 0 || quota?.book.restricted}
       okButtonType={'primary'}
       backdrop={undefined}
     >
@@ -381,72 +370,35 @@ const SeriesRequestModal = ({
               <table className="min-w-full">
                 <thead>
                   <tr>
-                    <th className="w-16 bg-gray-700/80 px-4 py-3">
-                      <SlideCheckbox
-                        checked={isAllFormats}
-                        onClick={toggleAllFormats}
-                      />
-                    </th>
-                    <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      {intl.formatMessage(messages.format)}
-                    </th>
-                    <th className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      {intl.formatMessage(globalMessages.status)}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {visibleFormats.map((is4k) => (
-                    <tr key={`series-format-${is4k}`}>
-                      <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                        <SlideCheckbox
-                          checked={formats.includes(is4k)}
-                          onClick={() => toggleFormat(is4k)}
-                        />
-                      </td>
-                      <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
-                        {intl.formatMessage(
-                          is4k ? messages.audiobook : messages.ebook
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap py-4 pr-2 text-sm leading-5 text-gray-200 md:px-6">
-                        {statusBadge(seriesFormatStatus(is4k))}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col">
-        <div className="-mx-4 sm:mx-0">
-          <div className="inline-block min-w-full py-2 align-middle">
-            <div className="overflow-hidden border border-gray-700 shadow backdrop-blur sm:rounded-lg">
-              <table className="min-w-full">
-                <thead>
-                  <tr>
-                    <th className="w-16 bg-gray-700/80 px-4 py-3">
-                      <div
-                        className={
-                          requestableBooks.length
-                            ? ''
-                            : 'pointer-events-none opacity-50'
-                        }
-                      >
-                        <SlideCheckbox
-                          checked={isAllParts}
-                          onClick={toggleAllParts}
-                        />
-                      </div>
-                    </th>
                     <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
                       {intl.formatMessage(globalMessages.book)}
                     </th>
-                    <th className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      {intl.formatMessage(globalMessages.status)}
-                    </th>
+                    {visibleFormats.map((is4k) => (
+                      <th
+                        key={`series-format-head-${is4k}`}
+                        className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-4"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={
+                              formatColumn(is4k).length
+                                ? ''
+                                : 'pointer-events-none opacity-50'
+                            }
+                          >
+                            <SlideCheckbox
+                              checked={isWholeColumn(is4k)}
+                              onClick={() => toggleColumn(is4k)}
+                            />
+                          </div>
+                          <span>
+                            {intl.formatMessage(
+                              is4k ? messages.audiobook : messages.ebook
+                            )}
+                          </span>
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
@@ -458,80 +410,66 @@ const SeriesRequestModal = ({
                         );
                       return book;
                     })
-                    .map((book) => {
-                      const selectable = requestableBooks.includes(book.id);
-
-                      return (
-                        <tr key={`book-${book.id}`}>
-                          <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                            <div
-                              className={
-                                selectable
-                                  ? ''
-                                  : 'pointer-events-none opacity-50'
-                              }
-                            >
-                              <SlideCheckbox
-                                checked={parts.includes(book.id) || !selectable}
-                                onClick={() => togglePart(book.id)}
+                    .map((book) => (
+                      <tr key={`book-${book.id}`}>
+                        <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
+                          <div className="flex">
+                            <div className="w-10 flex-shrink-0">
+                              <CachedImage
+                                type="hardcover"
+                                src={book.posterPath ?? ''}
+                                alt=""
+                                sizes="100vw"
+                                style={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  objectFit: 'cover',
+                                }}
+                                width={600}
+                                height={900}
                               />
                             </div>
-                          </td>
-                          <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
-                            <div className="flex">
-                              <div className="w-10 flex-shrink-0">
-                                <CachedImage
-                                  type="hardcover"
-                                  src={book.posterPath ?? ''}
-                                  alt=""
-                                  sizes="100vw"
-                                  style={{
-                                    width: '100%',
-                                    height: 'auto',
-                                    objectFit: 'cover',
-                                  }}
-                                  width={600}
-                                  height={900}
-                                />
+                            <div className="flex flex-col justify-center pl-2">
+                              <div className="text-xs font-medium">
+                                {book.releaseDate?.slice(0, 4)}
+                                {book.position && ` - #${book.position}`}
                               </div>
-                              <div className="flex flex-col justify-center pl-2">
-                                <div className="text-xs font-medium">
-                                  {book.releaseDate?.slice(0, 4)}
-                                  {book.position && ` - #${book.position}`}
-                                </div>
-                                <div className="text-base font-bold">
-                                  {book.title}
-                                </div>
+                              <div className="text-base font-bold">
+                                {book.title}
                               </div>
                             </div>
-                          </td>
-                          <td className="whitespace-nowrap py-4 pr-2 text-sm leading-5 text-gray-200 md:px-6">
-                            <div className="flex flex-col items-start gap-1">
-                              {visibleFormats.map((is4k) => (
+                          </div>
+                        </td>
+                        {visibleFormats.map((is4k) => {
+                          const selectable = isRequestable(book.id, is4k);
+
+                          return (
+                            <td
+                              key={`book-${book.id}-format-${is4k}`}
+                              className="whitespace-nowrap px-2 py-4 text-sm leading-5 text-gray-200 md:px-4"
+                            >
+                              <div className="flex items-center gap-2">
                                 <div
-                                  key={`book-${book.id}-status-${is4k}`}
-                                  className="flex items-center gap-1"
+                                  className={
+                                    selectable
+                                      ? ''
+                                      : 'pointer-events-none opacity-50'
+                                  }
                                 >
-                                  {visibleFormats.length > 1 && (
-                                    <span className="text-xs uppercase tracking-wider text-gray-400">
-                                      {intl.formatMessage(
-                                        is4k
-                                          ? messages.audiobook
-                                          : messages.ebook
-                                      )}
-                                    </span>
-                                  )}
-                                  {statusBadge(
-                                    bookStatus(book.id, is4k),
-                                    !!bookRequest(book.id, is4k)
-                                  )}
+                                  <SlideCheckbox
+                                    checked={
+                                      isSelected(book.id, is4k) || !selectable
+                                    }
+                                    onClick={() => toggle(book.id, is4k)}
+                                  />
                                 </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                                {statusBadge(book.id, is4k)}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -540,16 +478,16 @@ const SeriesRequestModal = ({
       </div>
       {(hasPermission(Permission.REQUEST_ADVANCED) ||
         hasPermission(Permission.MANAGE_REQUESTS)) &&
-        formats.length > 0 && (
+        selectedFormats.length > 0 && (
           <>
-            {formats.length > 1 && (
+            {selectedFormats.length > 1 && (
               <div className="mb-2 mt-4 flex items-center text-lg font-semibold">
                 {intl.formatMessage(globalMessages.advanced)}
               </div>
             )}
-            {formats.map((is4k) => (
+            {selectedFormats.map((is4k) => (
               <div key={`advanced-requester-${is4k}`}>
-                {formats.length > 1 && (
+                {selectedFormats.length > 1 && (
                   <h3 className="mt-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                     {intl.formatMessage(
                       is4k ? messages.audiobook : messages.ebook
@@ -559,7 +497,7 @@ const SeriesRequestModal = ({
                 <AdvancedRequester
                   type={MediaType.BOOK}
                   is4k={is4k}
-                  hideTitle={formats.length > 1}
+                  hideTitle={selectedFormats.length > 1}
                   onChange={(overrides) => {
                     setFormatOverrides((current) => ({
                       ...current,
