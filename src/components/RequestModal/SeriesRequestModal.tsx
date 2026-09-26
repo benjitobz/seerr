@@ -59,6 +59,7 @@ const SeriesRequestModal = ({
     Record<string, RequestOverrides | undefined>
   >({});
   const [selection, setSelection] = useState<string[] | null>(null);
+  const [headerFormats, setHeaderFormats] = useState<boolean[] | null>(null);
   const { addToast } = useToasts();
   const { data, error } = useSWR<Series>(`/api/v1/series/${seriesId}`, {
     revalidateOnMount: true,
@@ -134,6 +135,11 @@ const SeriesRequestModal = ({
       .map((is4k) => pairKey(book.id, is4k))
   );
 
+  // Held apart from the rows so clearing the books cannot switch them off
+  const activeFormats = (headerFormats ?? defaultFormats).filter((is4k) =>
+    visibleFormats.includes(is4k)
+  );
+
   const selected = (selection ?? defaultSelection).filter((key) =>
     requestablePairs.includes(key)
   );
@@ -185,10 +191,7 @@ const SeriesRequestModal = ({
   const formatColumn = (is4k: boolean) =>
     requestablePairs.filter((key) => key.endsWith(`|${is4k ? 1 : 0}`));
 
-  const isWholeColumn = (is4k: boolean) => {
-    const column = formatColumn(is4k);
-    return column.length > 0 && column.every((key) => selected.includes(key));
-  };
+  const isWholeColumn = (is4k: boolean) => activeFormats.includes(is4k);
 
   const toggleColumn = (is4k: boolean) => {
     const column = formatColumn(is4k);
@@ -196,6 +199,7 @@ const SeriesRequestModal = ({
       return;
     }
     if (isWholeColumn(is4k)) {
+      setHeaderFormats(activeFormats.filter((format) => format !== is4k));
       setSelection(selected.filter((key) => !column.includes(key)));
       return;
     }
@@ -206,25 +210,22 @@ const SeriesRequestModal = ({
     if (quota?.book.limit && booksAfter.size > (quota.book.remaining ?? 0)) {
       return;
     }
+    setHeaderFormats([...activeFormats, is4k]);
     setSelection([...new Set([...selected, ...column])]);
   };
 
   const requestableFormatsFor = (bookId: number) =>
     visibleFormats.filter((is4k) => isRequestable(bookId, is4k));
 
-  const defaultFormatsFor = (bookId: number) => {
-    const preferred = defaultFormats.filter((is4k) =>
-      isRequestable(bookId, is4k)
-    );
-    return preferred.length ? preferred : requestableFormatsFor(bookId);
-  };
+  const applicableFormats = (bookId: number) =>
+    activeFormats.filter((is4k) => isRequestable(bookId, is4k));
 
   const bookSelectable = (bookId: number) =>
     requestableFormatsFor(bookId).length > 0;
   const bookIncluded = (bookId: number) =>
     selected.some((key) => key.startsWith(`${bookId}|`));
 
-  // The leading toggle clears a book outright, or restores it at the defaults
+  // The leading toggle clears a book outright, or takes it at the chosen formats
   const toggleBook = (bookId: number) => {
     if (!bookSelectable(bookId)) {
       return;
@@ -233,13 +234,13 @@ const SeriesRequestModal = ({
       setSelection(selected.filter((key) => !key.startsWith(`${bookId}|`)));
       return;
     }
-    if (wouldExceedQuota(bookId)) {
+    if (wouldExceedQuota(bookId) || !applicableFormats(bookId).length) {
       return;
     }
     setSelection([
       ...new Set([
         ...selected,
-        ...defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k)),
+        ...applicableFormats(bookId).map((is4k) => pairKey(bookId, is4k)),
       ]),
     ]);
   };
@@ -250,14 +251,16 @@ const SeriesRequestModal = ({
   const allBooksIncluded =
     selectableBooks.length > 0 && selectableBooks.every(bookIncluded);
 
+  // Only decides which books are in; the chosen formats are left untouched
   const toggleAllBooks = () => {
     if (allBooksIncluded) {
       setSelection([]);
       return;
     }
     if (
-      quota?.book.limit &&
-      selectableBooks.length > (quota.book.remaining ?? 0)
+      !activeFormats.length ||
+      (quota?.book.limit &&
+        selectableBooks.length > (quota.book.remaining ?? 0))
     ) {
       return;
     }
@@ -265,7 +268,7 @@ const SeriesRequestModal = ({
       ...new Set([
         ...selected,
         ...selectableBooks.flatMap((bookId) =>
-          defaultFormatsFor(bookId).map((is4k) => pairKey(bookId, is4k))
+          applicableFormats(bookId).map((is4k) => pairKey(bookId, is4k))
         ),
       ]),
     ]);
@@ -318,7 +321,11 @@ const SeriesRequestModal = ({
 
   const allBooksToggle = () => (
     <div
-      className={selectableBooks.length ? '' : 'pointer-events-none opacity-50'}
+      className={
+        selectableBooks.length && activeFormats.length
+          ? ''
+          : 'pointer-events-none opacity-50'
+      }
     >
       <SlideCheckbox checked={allBooksIncluded} onClick={toggleAllBooks} />
     </div>
@@ -348,7 +355,7 @@ const SeriesRequestModal = ({
     </div>
   );
 
-  const formatToggle = (bookId: number, is4k: boolean, withLabel = false) => {
+  const formatToggle = (bookId: number, is4k: boolean) => {
     const selectable = isRequestable(bookId, is4k);
 
     return (
@@ -359,11 +366,9 @@ const SeriesRequestModal = ({
             onClick={() => toggle(bookId, is4k)}
           />
         </div>
-        {withLabel && (
-          <span className="w-20 flex-shrink-0 text-xs font-medium uppercase tracking-wider text-gray-400">
-            {intl.formatMessage(is4k ? messages.audiobook : messages.ebook)}
-          </span>
-        )}
+        <span className="w-20 flex-shrink-0 text-xs font-medium uppercase tracking-wider text-gray-400">
+          {intl.formatMessage(is4k ? messages.audiobook : messages.ebook)}
+        </span>
         {statusBadge(bookId, is4k)}
       </div>
     );
@@ -487,54 +492,29 @@ const SeriesRequestModal = ({
               <table className="min-w-full">
                 <thead>
                   <tr>
-                    <th className="hidden w-16 bg-gray-700/80 px-4 py-3 md:table-cell">
-                      {allBooksToggle()}
-                    </th>
-                    <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      <span className="hidden md:inline">
-                        {intl.formatMessage(globalMessages.book)}
-                      </span>
-                      <div className="md:hidden">
-                        <div className="flex items-center justify-center gap-2">
-                          {allBooksToggle()}
-                          <span>{intl.formatMessage(messages.fullseries)}</span>
-                        </div>
-                        <div className="my-3 border-t border-gray-600" />
-                        <div className="text-center">
-                          {intl.formatMessage(messages.formats)}
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-                          {visibleFormats.map((is4k) => (
-                            <div
-                              key={`series-format-head-sm-${is4k}`}
-                              className="flex items-center gap-2"
-                            >
-                              {columnToggle(is4k)}
-                              <span>
-                                {intl.formatMessage(
-                                  is4k ? messages.audiobook : messages.ebook
-                                )}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                    <th className="bg-gray-700/80 px-4 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200">
+                      <div className="flex items-center gap-2">
+                        {allBooksToggle()}
+                        <span>{intl.formatMessage(messages.fullseries)}</span>
+                      </div>
+                      <div className="my-3 border-t border-gray-600" />
+                      <div>{intl.formatMessage(messages.formats)}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+                        {visibleFormats.map((is4k) => (
+                          <div
+                            key={`series-format-head-${is4k}`}
+                            className="flex items-center gap-2"
+                          >
+                            {columnToggle(is4k)}
+                            <span>
+                              {intl.formatMessage(
+                                is4k ? messages.audiobook : messages.ebook
+                              )}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </th>
-                    {visibleFormats.map((is4k) => (
-                      <th
-                        key={`series-format-head-${is4k}`}
-                        className="hidden bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:table-cell md:px-4"
-                      >
-                        <div className="flex items-center gap-2">
-                          {columnToggle(is4k)}
-                          <span>
-                            {intl.formatMessage(
-                              is4k ? messages.audiobook : messages.ebook
-                            )}
-                          </span>
-                        </div>
-                      </th>
-                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
@@ -548,14 +528,9 @@ const SeriesRequestModal = ({
                     })
                     .map((book) => (
                       <tr key={`book-${book.id}`}>
-                        <td className="hidden whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100 md:table-cell">
-                          {bookToggle(book.id)}
-                        </td>
-                        <td className="px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:whitespace-nowrap md:px-6">
-                          <div className="mb-2 md:hidden">
-                            {bookToggle(book.id)}
-                          </div>
-                          <div className="mx-auto w-fit md:mx-0 md:w-auto">
+                        <td className="px-4 py-4 text-sm font-medium leading-5 text-gray-100">
+                          <div className="mb-2">{bookToggle(book.id)}</div>
+                          <div className="mx-auto w-fit">
                             <div className="flex">
                               <div className="w-10 flex-shrink-0">
                                 <CachedImage
@@ -572,7 +547,7 @@ const SeriesRequestModal = ({
                                   height={900}
                                 />
                               </div>
-                              <div className="flex max-w-[13rem] flex-col justify-center pl-2 md:max-w-none">
+                              <div className="flex max-w-[13rem] flex-col justify-center pl-2">
                                 <div className="text-xs font-medium">
                                   {book.releaseDate?.slice(0, 4)}
                                   {book.position && ` - #${book.position}`}
@@ -582,23 +557,15 @@ const SeriesRequestModal = ({
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-3 flex flex-col gap-2 md:hidden">
+                            <div className="mt-3 flex flex-col gap-2">
                               {visibleFormats.map((is4k) => (
-                                <div key={`book-${book.id}-format-sm-${is4k}`}>
-                                  {formatToggle(book.id, is4k, true)}
+                                <div key={`book-${book.id}-format-${is4k}`}>
+                                  {formatToggle(book.id, is4k)}
                                 </div>
                               ))}
                             </div>
                           </div>
                         </td>
-                        {visibleFormats.map((is4k) => (
-                          <td
-                            key={`book-${book.id}-format-${is4k}`}
-                            className="hidden whitespace-nowrap px-2 py-4 text-sm leading-5 text-gray-200 md:table-cell md:px-4"
-                          >
-                            {formatToggle(book.id, is4k)}
-                          </td>
-                        ))}
                       </tr>
                     ))}
                 </tbody>
