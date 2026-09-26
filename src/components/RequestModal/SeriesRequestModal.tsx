@@ -32,6 +32,8 @@ const messages = defineMessages('components.RequestModal', {
   selectbooks: 'Select Book(s)',
   ebook: 'Ebook',
   audiobook: 'Audiobook',
+  fullseries: 'Full Series',
+  formats: 'Formats',
   requestbooks: 'Request {count} {count, plural, one {Book} other {Books}}',
 });
 
@@ -322,6 +324,19 @@ const SeriesRequestModal = ({
     </div>
   );
 
+  const columnToggle = (is4k: boolean) => (
+    <div
+      className={
+        formatColumn(is4k).length ? '' : 'pointer-events-none opacity-50'
+      }
+    >
+      <SlideCheckbox
+        checked={isWholeColumn(is4k)}
+        onClick={() => toggleColumn(is4k)}
+      />
+    </div>
+  );
+
   const bookToggle = (bookId: number) => (
     <div
       className={bookSelectable(bookId) ? '' : 'pointer-events-none opacity-50'}
@@ -476,35 +491,33 @@ const SeriesRequestModal = ({
                       {allBooksToggle()}
                     </th>
                     <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      <div className="flex items-center gap-2">
-                        <span className="md:hidden">{allBooksToggle()}</span>
-                        <span>{intl.formatMessage(globalMessages.book)}</span>
-                      </div>
-                      <div className="mt-2 flex flex-col gap-1 md:hidden">
-                        {visibleFormats.map((is4k) => (
-                          <div
-                            key={`series-format-head-sm-${is4k}`}
-                            className="flex items-center gap-2"
-                          >
+                      <span className="hidden md:inline">
+                        {intl.formatMessage(globalMessages.book)}
+                      </span>
+                      <div className="md:hidden">
+                        <div className="flex items-center justify-center gap-2">
+                          {allBooksToggle()}
+                          <span>{intl.formatMessage(messages.fullseries)}</span>
+                        </div>
+                        <div className="my-3 border-t border-gray-600" />
+                        <div className="text-center">
+                          {intl.formatMessage(messages.formats)}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                          {visibleFormats.map((is4k) => (
                             <div
-                              className={
-                                formatColumn(is4k).length
-                                  ? ''
-                                  : 'pointer-events-none opacity-50'
-                              }
+                              key={`series-format-head-sm-${is4k}`}
+                              className="flex items-center gap-2"
                             >
-                              <SlideCheckbox
-                                checked={isWholeColumn(is4k)}
-                                onClick={() => toggleColumn(is4k)}
-                              />
+                              {columnToggle(is4k)}
+                              <span>
+                                {intl.formatMessage(
+                                  is4k ? messages.audiobook : messages.ebook
+                                )}
+                              </span>
                             </div>
-                            <span>
-                              {intl.formatMessage(
-                                is4k ? messages.audiobook : messages.ebook
-                              )}
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     </th>
                     {visibleFormats.map((is4k) => (
@@ -513,18 +526,7 @@ const SeriesRequestModal = ({
                         className="hidden bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:table-cell md:px-4"
                       >
                         <div className="flex items-center gap-2">
-                          <div
-                            className={
-                              formatColumn(is4k).length
-                                ? ''
-                                : 'pointer-events-none opacity-50'
-                            }
-                          >
-                            <SlideCheckbox
-                              checked={isWholeColumn(is4k)}
-                              onClick={() => toggleColumn(is4k)}
-                            />
-                          </div>
+                          {columnToggle(is4k)}
                           <span>
                             {intl.formatMessage(
                               is4k ? messages.audiobook : messages.ebook
