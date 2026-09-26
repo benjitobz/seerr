@@ -190,10 +190,20 @@ class ImageProxy {
 
     // If the image is stale, we will revalidate it in the background.
     if (imageResponse.meta.isStale) {
-      this.set(path, cacheKey);
+      this.revalidate(path, cacheKey);
     }
 
     return imageResponse;
+  }
+
+  // Refreshing writes the original back over the cache entry, so anything that
+  // was optimized has to be optimized again or it reverts on every expiry
+  private async revalidate(path: string, cacheKey: string): Promise<void> {
+    const refreshed = await this.set(path, cacheKey);
+
+    if (this.transform && refreshed) {
+      await this.optimizeAndCache(refreshed, cacheKey);
+    }
   }
 
   private async optimizeAndCache(
