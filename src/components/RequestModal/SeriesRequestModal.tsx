@@ -46,8 +46,6 @@ interface RequestModalProps extends React.HTMLAttributes<HTMLDivElement> {
   onUpdating?: (isUpdating: boolean) => void;
 }
 
-const pairKey = (bookId: number, is4k: boolean) => `${bookId}|${is4k ? 1 : 0}`;
-
 const SeriesRequestModal = ({
   onCancel,
   onComplete,
@@ -58,7 +56,8 @@ const SeriesRequestModal = ({
   const [formatOverrides, setFormatOverrides] = useState<
     Record<string, RequestOverrides | undefined>
   >({});
-  const [selection, setSelection] = useState<string[] | null>(null);
+  const [excludedBooks, setExcludedBooks] = useState<number[]>([]);
+  const [bookFormats, setBookFormats] = useState<Record<number, boolean[]>>({});
   const [headerFormats, setHeaderFormats] = useState<boolean[] | null>(null);
   const { addToast } = useToasts();
   const { data, error } = useSWR<Series>(`/api/v1/series/${seriesId}`, {
@@ -119,38 +118,46 @@ const SeriesRequestModal = ({
     return status === MediaStatus.UNKNOWN || status === MediaStatus.DELETED;
   };
 
-  const requestablePairs = books.flatMap((book) =>
-    visibleFormats
-      .filter((is4k) => isRequestable(book.id, is4k))
-      .map((is4k) => pairKey(book.id, is4k))
-  );
-
   // Both formats are pre-selected only when the global default says so
   const defaultFormats = settings.currentSettings.syncBookFormatRequests
     ? visibleFormats
     : visibleFormats.slice(0, 1);
-  const defaultSelection = books.flatMap((book) =>
-    defaultFormats
-      .filter((is4k) => isRequestable(book.id, is4k))
-      .map((is4k) => pairKey(book.id, is4k))
-  );
 
-  // Held apart from the rows so clearing the books cannot switch them off
+  // The header choice, which a book follows until that book is changed
   const activeFormats = (headerFormats ?? defaultFormats).filter((is4k) =>
     visibleFormats.includes(is4k)
   );
 
-  const selected = (selection ?? defaultSelection).filter((key) =>
-    requestablePairs.includes(key)
-  );
-  const isSelected = (bookId: number, is4k: boolean) =>
-    selected.includes(pairKey(bookId, is4k));
+  const requestableFormatsFor = (bookId: number) =>
+    visibleFormats.filter((is4k) => isRequestable(bookId, is4k));
 
-  const selectedBookIds = [
-    ...new Set(selected.map((key) => Number(key.split('|')[0]))),
-  ];
+  const formatsForBook = (bookId: number) =>
+    (bookFormats[bookId] ?? activeFormats).filter((is4k) =>
+      isRequestable(bookId, is4k)
+    );
+
+  const isSelected = (bookId: number, is4k: boolean) =>
+    formatsForBook(bookId).includes(is4k);
+
+  const bookSelectable = (bookId: number) =>
+    requestableFormatsFor(bookId).length > 0;
+
+  const selectableBooks = books
+    .filter((book) => bookSelectable(book.id))
+    .map((book) => book.id);
+
+  const anyBookHasFormats = selectableBooks.some(
+    (bookId) => formatsForBook(bookId).length > 0
+  );
+
+  // Switched off, or left without a format, means the book is not requested
+  const bookIncluded = (bookId: number) =>
+    !excludedBooks.includes(bookId) && formatsForBook(bookId).length > 0;
+
+  const selectedBookIds = selectableBooks.filter(bookIncluded);
+
   const selectedFormats = visibleFormats.filter((is4k) =>
-    selected.some((key) => key.endsWith(`|${is4k ? 1 : 0}`))
+    selectedBookIds.some((bookId) => isSelected(bookId, is4k))
   );
 
   const quotaUser =
@@ -173,105 +180,87 @@ const SeriesRequestModal = ({
     currentlyRemaining <= 0 &&
     !selectedBookIds.includes(bookId);
 
+  // Changing a book's formats detaches that book from the header choice
   const toggle = (bookId: number, is4k: boolean) => {
     if (!isRequestable(bookId, is4k)) {
       return;
     }
-    const key = pairKey(bookId, is4k);
-    if (!selected.includes(key) && wouldExceedQuota(bookId)) {
+    const current = formatsForBook(bookId);
+    const adding = !current.includes(is4k);
+    if (adding && !bookIncluded(bookId) && wouldExceedQuota(bookId)) {
       return;
     }
-    setSelection(
-      selected.includes(key)
-        ? selected.filter((entry) => entry !== key)
-        : [...selected, key]
-    );
+    setBookFormats({
+      ...bookFormats,
+      [bookId]: adding
+        ? [...current, is4k]
+        : current.filter((format) => format !== is4k),
+    });
+    if (adding) {
+      setExcludedBooks(excludedBooks.filter((id) => id !== bookId));
+    }
   };
 
   const formatColumn = (is4k: boolean) =>
-    requestablePairs.filter((key) => key.endsWith(`|${is4k ? 1 : 0}`));
+    selectableBooks.filter((bookId) => isRequestable(bookId, is4k));
 
   const isWholeColumn = (is4k: boolean) => activeFormats.includes(is4k);
 
+  // Every book that was not changed individually follows this
   const toggleColumn = (is4k: boolean) => {
-    const column = formatColumn(is4k);
-    if (!column.length) {
+    if (!formatColumn(is4k).length) {
       return;
     }
-    if (isWholeColumn(is4k)) {
-      setHeaderFormats(activeFormats.filter((format) => format !== is4k));
-      setSelection(selected.filter((key) => !column.includes(key)));
-      return;
-    }
-    const booksAfter = new Set([
-      ...selectedBookIds,
-      ...column.map((key) => Number(key.split('|')[0])),
-    ]);
-    if (quota?.book.limit && booksAfter.size > (quota.book.remaining ?? 0)) {
-      return;
-    }
-    setHeaderFormats([...activeFormats, is4k]);
-    setSelection([...new Set([...selected, ...column])]);
+    setHeaderFormats(
+      isWholeColumn(is4k)
+        ? activeFormats.filter((format) => format !== is4k)
+        : [...activeFormats, is4k]
+    );
   };
 
-  const requestableFormatsFor = (bookId: number) =>
-    visibleFormats.filter((is4k) => isRequestable(bookId, is4k));
-
-  const applicableFormats = (bookId: number) =>
-    activeFormats.filter((is4k) => isRequestable(bookId, is4k));
-
-  const bookSelectable = (bookId: number) =>
-    requestableFormatsFor(bookId).length > 0;
-  const bookIncluded = (bookId: number) =>
-    selected.some((key) => key.startsWith(`${bookId}|`));
-
-  // The leading toggle clears a book outright, or takes it at the chosen formats
+  // Switching a book off leaves its formats alone; it is simply not requested
   const toggleBook = (bookId: number) => {
     if (!bookSelectable(bookId)) {
       return;
     }
     if (bookIncluded(bookId)) {
-      setSelection(selected.filter((key) => !key.startsWith(`${bookId}|`)));
+      setExcludedBooks([...new Set([...excludedBooks, bookId])]);
       return;
     }
-    if (wouldExceedQuota(bookId) || !applicableFormats(bookId).length) {
+    if (wouldExceedQuota(bookId)) {
       return;
     }
-    setSelection([
-      ...new Set([
-        ...selected,
-        ...applicableFormats(bookId).map((is4k) => pairKey(bookId, is4k)),
-      ]),
-    ]);
+    setExcludedBooks(excludedBooks.filter((id) => id !== bookId));
+    if (!formatsForBook(bookId).length) {
+      const restored = { ...bookFormats };
+      delete restored[bookId];
+      setBookFormats(restored);
+    }
   };
 
-  const selectableBooks = books
-    .filter((book) => bookSelectable(book.id))
-    .map((book) => book.id);
   const allBooksIncluded =
     selectableBooks.length > 0 && selectableBooks.every(bookIncluded);
 
   // Only decides which books are in; the chosen formats are left untouched
   const toggleAllBooks = () => {
     if (allBooksIncluded) {
-      setSelection([]);
+      setExcludedBooks(selectableBooks);
       return;
     }
     if (
-      !activeFormats.length ||
-      (quota?.book.limit &&
-        selectableBooks.length > (quota.book.remaining ?? 0))
+      quota?.book.limit &&
+      selectableBooks.length > (quota.book.remaining ?? 0)
     ) {
       return;
     }
-    setSelection([
-      ...new Set([
-        ...selected,
-        ...selectableBooks.flatMap((bookId) =>
-          applicableFormats(bookId).map((is4k) => pairKey(bookId, is4k))
-        ),
-      ]),
-    ]);
+    setExcludedBooks([]);
+    const restored = { ...bookFormats };
+    Object.keys(restored).forEach((key) => {
+      if (!restored[Number(key)].length) {
+        delete restored[Number(key)];
+      }
+    });
+    setBookFormats(restored);
   };
 
   const statusBadge = (bookId: number, is4k: boolean) => {
@@ -322,7 +311,7 @@ const SeriesRequestModal = ({
   const allBooksToggle = () => (
     <div
       className={
-        selectableBooks.length && activeFormats.length
+        selectableBooks.length && anyBookHasFormats
           ? ''
           : 'pointer-events-none opacity-50'
       }
@@ -375,7 +364,7 @@ const SeriesRequestModal = ({
   };
 
   const sendRequest = async () => {
-    if (!selected.length) {
+    if (!selectedBookIds.length) {
       return;
     }
     setIsUpdating(true);
@@ -386,7 +375,7 @@ const SeriesRequestModal = ({
           selectedBookIds.map((bookId) =>
             requestBookFormats(
               bookId,
-              visibleFormats.filter((is4k) => isSelected(bookId, is4k)),
+              formatsForBook(bookId),
               (is4k) => formatOverrides[String(is4k)]
             )
           )
@@ -463,7 +452,9 @@ const SeriesRequestModal = ({
                 count: selectedBookIds.length,
               })
       }
-      okDisabled={isUpdating || selected.length === 0 || quota?.book.restricted}
+      okDisabled={
+        isUpdating || selectedBookIds.length === 0 || quota?.book.restricted
+      }
       okButtonType={'primary'}
       backdrop={undefined}
     >
