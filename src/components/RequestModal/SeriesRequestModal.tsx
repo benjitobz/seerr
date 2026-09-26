@@ -553,7 +553,7 @@ const SeriesRequestModal = ({
                           <div className="mb-2 md:hidden">
                             {bookToggle(book.id)}
                           </div>
-                          <div className="flex">
+                          <div className="flex justify-center md:justify-start">
                             <div className="w-10 flex-shrink-0">
                               <CachedImage
                                 type="hardcover"
@@ -579,7 +579,7 @@ const SeriesRequestModal = ({
                               </div>
                             </div>
                           </div>
-                          <div className="mt-3 flex flex-col gap-2 md:hidden">
+                          <div className="mx-auto mt-3 flex w-fit flex-col gap-2 md:hidden">
                             {visibleFormats.map((is4k) => (
                               <div key={`book-${book.id}-format-sm-${is4k}`}>
                                 {formatToggle(book.id, is4k, true)}
