@@ -314,6 +314,27 @@ const SeriesRequestModal = ({
     return <Badge>{intl.formatMessage(globalMessages.notrequested)}</Badge>;
   };
 
+  const formatToggle = (bookId: number, is4k: boolean, withLabel = false) => {
+    const selectable = isRequestable(bookId, is4k);
+
+    return (
+      <div className="flex items-center gap-2">
+        <div className={selectable ? '' : 'pointer-events-none opacity-50'}>
+          <SlideCheckbox
+            checked={isSelected(bookId, is4k) || !selectable}
+            onClick={() => toggle(bookId, is4k)}
+          />
+        </div>
+        {withLabel && (
+          <span className="w-20 flex-shrink-0 text-xs font-medium uppercase tracking-wider text-gray-400">
+            {intl.formatMessage(is4k ? messages.audiobook : messages.ebook)}
+          </span>
+        )}
+        {statusBadge(bookId, is4k)}
+      </div>
+    );
+  };
+
   const sendRequest = async () => {
     if (!selected.length) {
       return;
@@ -448,11 +469,37 @@ const SeriesRequestModal = ({
                     </th>
                     <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
                       {intl.formatMessage(globalMessages.book)}
+                      <div className="mt-2 flex flex-col gap-1 md:hidden">
+                        {visibleFormats.map((is4k) => (
+                          <div
+                            key={`series-format-head-sm-${is4k}`}
+                            className="flex items-center gap-2"
+                          >
+                            <div
+                              className={
+                                formatColumn(is4k).length
+                                  ? ''
+                                  : 'pointer-events-none opacity-50'
+                              }
+                            >
+                              <SlideCheckbox
+                                checked={isWholeColumn(is4k)}
+                                onClick={() => toggleColumn(is4k)}
+                              />
+                            </div>
+                            <span>
+                              {intl.formatMessage(
+                                is4k ? messages.audiobook : messages.ebook
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </th>
                     {visibleFormats.map((is4k) => (
                       <th
                         key={`series-format-head-${is4k}`}
-                        className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-4"
+                        className="hidden bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:table-cell md:px-4"
                       >
                         <div className="flex items-center gap-2">
                           <div
@@ -505,7 +552,7 @@ const SeriesRequestModal = ({
                             />
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
+                        <td className="px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:whitespace-nowrap md:px-6">
                           <div className="flex">
                             <div className="w-10 flex-shrink-0">
                               <CachedImage
@@ -532,35 +579,22 @@ const SeriesRequestModal = ({
                               </div>
                             </div>
                           </div>
-                        </td>
-                        {visibleFormats.map((is4k) => {
-                          const selectable = isRequestable(book.id, is4k);
-
-                          return (
-                            <td
-                              key={`book-${book.id}-format-${is4k}`}
-                              className="whitespace-nowrap px-2 py-4 text-sm leading-5 text-gray-200 md:px-4"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={
-                                    selectable
-                                      ? ''
-                                      : 'pointer-events-none opacity-50'
-                                  }
-                                >
-                                  <SlideCheckbox
-                                    checked={
-                                      isSelected(book.id, is4k) || !selectable
-                                    }
-                                    onClick={() => toggle(book.id, is4k)}
-                                  />
-                                </div>
-                                {statusBadge(book.id, is4k)}
+                          <div className="mt-3 flex flex-col gap-2 md:hidden">
+                            {visibleFormats.map((is4k) => (
+                              <div key={`book-${book.id}-format-sm-${is4k}`}>
+                                {formatToggle(book.id, is4k, true)}
                               </div>
-                            </td>
-                          );
-                        })}
+                            ))}
+                          </div>
+                        </td>
+                        {visibleFormats.map((is4k) => (
+                          <td
+                            key={`book-${book.id}-format-${is4k}`}
+                            className="hidden whitespace-nowrap px-2 py-4 text-sm leading-5 text-gray-200 md:table-cell md:px-4"
+                          >
+                            {formatToggle(book.id, is4k)}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                 </tbody>
