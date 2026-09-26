@@ -314,6 +314,25 @@ const SeriesRequestModal = ({
     return <Badge>{intl.formatMessage(globalMessages.notrequested)}</Badge>;
   };
 
+  const allBooksToggle = () => (
+    <div
+      className={selectableBooks.length ? '' : 'pointer-events-none opacity-50'}
+    >
+      <SlideCheckbox checked={allBooksIncluded} onClick={toggleAllBooks} />
+    </div>
+  );
+
+  const bookToggle = (bookId: number) => (
+    <div
+      className={bookSelectable(bookId) ? '' : 'pointer-events-none opacity-50'}
+    >
+      <SlideCheckbox
+        checked={bookIncluded(bookId) || !bookSelectable(bookId)}
+        onClick={() => toggleBook(bookId)}
+      />
+    </div>
+  );
+
   const formatToggle = (bookId: number, is4k: boolean, withLabel = false) => {
     const selectable = isRequestable(bookId, is4k);
 
@@ -453,22 +472,14 @@ const SeriesRequestModal = ({
               <table className="min-w-full">
                 <thead>
                   <tr>
-                    <th className="w-16 bg-gray-700/80 px-4 py-3">
-                      <div
-                        className={
-                          selectableBooks.length
-                            ? ''
-                            : 'pointer-events-none opacity-50'
-                        }
-                      >
-                        <SlideCheckbox
-                          checked={allBooksIncluded}
-                          onClick={toggleAllBooks}
-                        />
-                      </div>
+                    <th className="hidden w-16 bg-gray-700/80 px-4 py-3 md:table-cell">
+                      {allBooksToggle()}
                     </th>
                     <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
-                      {intl.formatMessage(globalMessages.book)}
+                      <div className="flex items-center gap-2">
+                        <span className="md:hidden">{allBooksToggle()}</span>
+                        <span>{intl.formatMessage(globalMessages.book)}</span>
+                      </div>
                       <div className="mt-2 flex flex-col gap-1 md:hidden">
                         {visibleFormats.map((is4k) => (
                           <div
@@ -535,24 +546,13 @@ const SeriesRequestModal = ({
                     })
                     .map((book) => (
                       <tr key={`book-${book.id}`}>
-                        <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                          <div
-                            className={
-                              bookSelectable(book.id)
-                                ? ''
-                                : 'pointer-events-none opacity-50'
-                            }
-                          >
-                            <SlideCheckbox
-                              checked={
-                                bookIncluded(book.id) ||
-                                !bookSelectable(book.id)
-                              }
-                              onClick={() => toggleBook(book.id)}
-                            />
-                          </div>
+                        <td className="hidden whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100 md:table-cell">
+                          {bookToggle(book.id)}
                         </td>
                         <td className="px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:whitespace-nowrap md:px-6">
+                          <div className="mb-2 md:hidden">
+                            {bookToggle(book.id)}
+                          </div>
                           <div className="flex">
                             <div className="w-10 flex-shrink-0">
                               <CachedImage
