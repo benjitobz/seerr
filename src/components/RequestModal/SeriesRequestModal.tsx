@@ -557,7 +557,7 @@ const SeriesRequestModal = ({
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-3 flex flex-col gap-2">
+                            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
                               {visibleFormats.map((is4k) => (
                                 <div key={`book-${book.id}-format-${is4k}`}>
                                   {formatToggle(book.id, is4k)}
