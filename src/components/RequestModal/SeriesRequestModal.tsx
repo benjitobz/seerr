@@ -553,38 +553,40 @@ const SeriesRequestModal = ({
                           <div className="mb-2 md:hidden">
                             {bookToggle(book.id)}
                           </div>
-                          <div className="flex justify-center md:justify-start">
-                            <div className="w-10 flex-shrink-0">
-                              <CachedImage
-                                type="hardcover"
-                                src={book.posterPath ?? ''}
-                                alt=""
-                                sizes="100vw"
-                                style={{
-                                  width: '100%',
-                                  height: 'auto',
-                                  objectFit: 'cover',
-                                }}
-                                width={600}
-                                height={900}
-                              />
+                          <div className="mx-auto w-fit md:mx-0 md:w-auto">
+                            <div className="flex">
+                              <div className="w-10 flex-shrink-0">
+                                <CachedImage
+                                  type="hardcover"
+                                  src={book.posterPath ?? ''}
+                                  alt=""
+                                  sizes="100vw"
+                                  style={{
+                                    width: '100%',
+                                    height: 'auto',
+                                    objectFit: 'cover',
+                                  }}
+                                  width={600}
+                                  height={900}
+                                />
+                              </div>
+                              <div className="flex max-w-[13rem] flex-col justify-center pl-2 md:max-w-none">
+                                <div className="text-xs font-medium">
+                                  {book.releaseDate?.slice(0, 4)}
+                                  {book.position && ` - #${book.position}`}
+                                </div>
+                                <div className="text-base font-bold">
+                                  {book.title}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex flex-col justify-center pl-2">
-                              <div className="text-xs font-medium">
-                                {book.releaseDate?.slice(0, 4)}
-                                {book.position && ` - #${book.position}`}
-                              </div>
-                              <div className="text-base font-bold">
-                                {book.title}
-                              </div>
+                            <div className="mt-3 flex flex-col gap-2 md:hidden">
+                              {visibleFormats.map((is4k) => (
+                                <div key={`book-${book.id}-format-sm-${is4k}`}>
+                                  {formatToggle(book.id, is4k, true)}
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                          <div className="mx-auto mt-3 flex w-fit flex-col gap-2 md:hidden">
-                            {visibleFormats.map((is4k) => (
-                              <div key={`book-${book.id}-format-sm-${is4k}`}>
-                                {formatToggle(book.id, is4k, true)}
-                              </div>
-                            ))}
                           </div>
                         </td>
                         {visibleFormats.map((is4k) => (
