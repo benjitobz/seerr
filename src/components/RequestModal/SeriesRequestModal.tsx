@@ -33,6 +33,7 @@ const messages = defineMessages('components.RequestModal', {
   ebook: 'Ebook',
   audiobook: 'Audiobook',
   fullseries: 'Full Series',
+  editionsextras: 'Editions & Extras',
   requestbooks: 'Request {count} {count, plural, one {Book} other {Books}}',
 });
 
@@ -55,7 +56,7 @@ const SeriesRequestModal = ({
   const [formatOverrides, setFormatOverrides] = useState<
     Record<string, RequestOverrides | undefined>
   >({});
-  const [excludedBooks, setExcludedBooks] = useState<number[]>([]);
+  const [excludedState, setExcludedBooks] = useState<number[] | null>(null);
   const [bookFormats, setBookFormats] = useState<Record<number, boolean[]>>({});
   const [headerFormats, setHeaderFormats] = useState<boolean[] | null>(null);
   const { addToast } = useToasts();
@@ -84,6 +85,12 @@ const SeriesRequestModal = ({
 
   const visibleFormats = FORMATS.filter(canRequestFormat);
   const books = data?.books ?? [];
+  const ownBooks = books.filter((book) => !book.extra);
+  const extraBooks = books.filter((book) => book.extra);
+  const extraIds = extraBooks.map((book) => book.id);
+
+  // Editions and extras start out of the request; the series' own books start in
+  const excludedBooks = excludedState ?? extraIds;
 
   const bookStatus = (bookId: number, is4k: boolean) => {
     const book = books.find((b) => b.id === bookId);
@@ -144,6 +151,11 @@ const SeriesRequestModal = ({
   const selectableBooks = books
     .filter((book) => bookSelectable(book.id))
     .map((book) => book.id);
+
+  // Full Series covers the series' own books; editions are opted into singly
+  const primarySelectable = selectableBooks.filter(
+    (bookId) => !extraIds.includes(bookId)
+  );
 
   const bookExcluded = (bookId: number) => excludedBooks.includes(bookId);
 
@@ -247,21 +259,23 @@ const SeriesRequestModal = ({
   };
 
   const allBooksIncluded =
-    selectableBooks.length > 0 && selectableBooks.every(bookRequested);
+    primarySelectable.length > 0 && primarySelectable.every(bookRequested);
 
   // Only decides which books are in; the chosen formats are left untouched
   const toggleAllBooks = () => {
     if (allBooksIncluded) {
-      setExcludedBooks(selectableBooks);
+      setExcludedBooks([...new Set([...excludedBooks, ...primarySelectable])]);
       return;
     }
     if (
       quota?.book.limit &&
-      selectableBooks.length > (quota.book.remaining ?? 0)
+      primarySelectable.length > (quota.book.remaining ?? 0)
     ) {
       return;
     }
-    setExcludedBooks([]);
+    setExcludedBooks(
+      excludedBooks.filter((bookId) => !primarySelectable.includes(bookId))
+    );
     if (!activeFormats.length) {
       setHeaderFormats(visibleFormats);
     }
@@ -277,14 +291,14 @@ const SeriesRequestModal = ({
   // Every book available is available; some is partly so
   const seriesFormatStatus = (is4k: boolean) => {
     const key = is4k ? 'status4k' : 'status';
-    const available = books.filter(
+    const available = ownBooks.filter(
       (book) => book.mediaInfo?.[key] === MediaStatus.AVAILABLE
     ).length;
 
-    if (!books.length || !available) {
+    if (!ownBooks.length || !available) {
       return MediaStatus.UNKNOWN;
     }
-    return available === books.length
+    return available === ownBooks.length
       ? MediaStatus.AVAILABLE
       : MediaStatus.PARTIALLY_AVAILABLE;
   };
@@ -342,7 +356,9 @@ const SeriesRequestModal = ({
 
   const allBooksToggle = () => (
     <div
-      className={selectableBooks.length ? '' : 'pointer-events-none opacity-50'}
+      className={
+        primarySelectable.length ? '' : 'pointer-events-none opacity-50'
+      }
     >
       <SlideCheckbox checked={allBooksIncluded} onClick={toggleAllBooks} />
     </div>
@@ -470,6 +486,79 @@ const SeriesRequestModal = ({
     { type: 'or' }
   );
 
+  const booksTable = (title: string, list: Series['books']) => (
+    <div className="flex flex-col">
+      <div className="-mx-4 sm:mx-0">
+        <div className="inline-block min-w-full py-2 align-middle">
+          <div className="overflow-hidden border border-gray-700 shadow backdrop-blur sm:rounded-lg">
+            <table className="min-w-full">
+              <thead>
+                <tr>
+                  <th className="bg-gray-700/80 px-4 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200">
+                    {title}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {list
+                  .filter((book) => {
+                    if (!blocklistVisibility)
+                      return book.mediaInfo?.status !== MediaStatus.BLOCKLISTED;
+                    return book;
+                  })
+                  .map((book) => (
+                    <tr key={`book-${book.id}`}>
+                      <td className="px-4 py-4 text-sm font-medium leading-5 text-gray-100">
+                        <div>
+                          <div className="flex">
+                            <div className="w-10 flex-shrink-0">
+                              <CachedImage
+                                type="hardcover"
+                                src={book.posterPath ?? ''}
+                                alt=""
+                                sizes="100vw"
+                                style={{
+                                  width: '100%',
+                                  height: 'auto',
+                                  objectFit: 'cover',
+                                }}
+                                width={600}
+                                height={900}
+                              />
+                            </div>
+                            <div className="flex flex-col justify-center pl-2">
+                              <div className="text-xs font-medium">
+                                {book.releaseDate?.slice(0, 4)}
+                                {book.position && ` - #${book.position}`}
+                              </div>
+                              <div className="text-base font-bold">
+                                {book.title}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex items-center gap-3">
+                            {bookToggle(book.id)}
+                            <div className="self-stretch border-l border-gray-600" />
+                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
+                              {visibleFormats.map((is4k) => (
+                                <div key={`book-${book.id}-format-${is4k}`}>
+                                  {formatToggle(book.id, is4k)}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Modal
       loading={(!data && !error) || !quota}
@@ -551,78 +640,9 @@ const SeriesRequestModal = ({
           </div>
         </div>
       </div>
-      <div className="flex flex-col">
-        <div className="-mx-4 sm:mx-0">
-          <div className="inline-block min-w-full py-2 align-middle">
-            <div className="overflow-hidden border border-gray-700 shadow backdrop-blur sm:rounded-lg">
-              <table className="min-w-full">
-                <thead>
-                  <tr>
-                    <th className="bg-gray-700/80 px-4 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200">
-                      {intl.formatMessage(globalMessages.books)}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {books
-                    .filter((book) => {
-                      if (!blocklistVisibility)
-                        return (
-                          book.mediaInfo?.status !== MediaStatus.BLOCKLISTED
-                        );
-                      return book;
-                    })
-                    .map((book) => (
-                      <tr key={`book-${book.id}`}>
-                        <td className="px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                          <div>
-                            <div className="flex">
-                              <div className="w-10 flex-shrink-0">
-                                <CachedImage
-                                  type="hardcover"
-                                  src={book.posterPath ?? ''}
-                                  alt=""
-                                  sizes="100vw"
-                                  style={{
-                                    width: '100%',
-                                    height: 'auto',
-                                    objectFit: 'cover',
-                                  }}
-                                  width={600}
-                                  height={900}
-                                />
-                              </div>
-                              <div className="flex flex-col justify-center pl-2">
-                                <div className="text-xs font-medium">
-                                  {book.releaseDate?.slice(0, 4)}
-                                  {book.position && ` - #${book.position}`}
-                                </div>
-                                <div className="text-base font-bold">
-                                  {book.title}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex items-center gap-3">
-                              {bookToggle(book.id)}
-                              <div className="self-stretch border-l border-gray-600" />
-                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
-                                {visibleFormats.map((is4k) => (
-                                  <div key={`book-${book.id}-format-${is4k}`}>
-                                    {formatToggle(book.id, is4k)}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
+      {booksTable(intl.formatMessage(globalMessages.books), ownBooks)}
+      {extraBooks.length > 0 &&
+        booksTable(intl.formatMessage(messages.editionsextras), extraBooks)}
       {(hasPermission(Permission.REQUEST_ADVANCED) ||
         hasPermission(Permission.MANAGE_REQUESTS)) &&
         selectedFormats.length > 0 && (
