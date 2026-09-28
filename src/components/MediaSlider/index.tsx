@@ -69,20 +69,35 @@ const MediaSlider = ({
   if (settings.currentSettings.hideAvailable) {
     titles = titles.filter(
       (i) =>
-        (i.mediaType === 'movie' ||
+        !(
+          i.mediaType === 'movie' ||
           i.mediaType === 'tv' ||
-          i.mediaType == 'book') &&
-        i.mediaInfo?.status !== MediaStatus.AVAILABLE &&
-        i.mediaInfo?.status !== MediaStatus.PARTIALLY_AVAILABLE
+          i.mediaType === 'book'
+        ) ||
+        (i.mediaInfo?.status !== MediaStatus.AVAILABLE &&
+          i.mediaInfo?.status !== MediaStatus.PARTIALLY_AVAILABLE)
     );
   }
 
   if (settings.currentSettings.hideBlocklisted) {
     titles = titles.filter(
       (i) =>
-        (i.mediaType === 'movie' || i.mediaType === 'tv') &&
-        i.mediaInfo?.status !== MediaStatus.BLOCKLISTED
+        !(
+          i.mediaType === 'movie' ||
+          i.mediaType === 'tv' ||
+          i.mediaType === 'book'
+        ) || i.mediaInfo?.status !== MediaStatus.BLOCKLISTED
     );
+  }
+
+  if (settings.currentSettings.hideRequested) {
+    titles = titles.filter((i) => {
+      if (i.mediaType !== 'movie' && i.mediaType !== 'tv') {
+        return true;
+      }
+
+      return !i.mediaInfo?.hasActiveRequest;
+    });
   }
 
   useEffect(() => {
