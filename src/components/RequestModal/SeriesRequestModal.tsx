@@ -33,7 +33,6 @@ const messages = defineMessages('components.RequestModal', {
   ebook: 'Ebook',
   audiobook: 'Audiobook',
   fullseries: 'Full Series',
-  formats: 'Formats',
   requestbooks: 'Request {count} {count, plural, one {Book} other {Books}}',
 });
 
@@ -263,10 +262,25 @@ const SeriesRequestModal = ({
     setBookFormats(restored);
   };
 
-  const statusBadge = (bookId: number, is4k: boolean) => {
-    const status = bookStatus(bookId, is4k);
-    const request = bookRequest(bookId, is4k);
+  // Every book available is available; some is partly so
+  const seriesFormatStatus = (is4k: boolean) => {
+    const key = is4k ? 'status4k' : 'status';
+    const available = books.filter(
+      (book) => book.mediaInfo?.[key] === MediaStatus.AVAILABLE
+    ).length;
 
+    if (!books.length || !available) {
+      return MediaStatus.UNKNOWN;
+    }
+    return available === books.length
+      ? MediaStatus.AVAILABLE
+      : MediaStatus.PARTIALLY_AVAILABLE;
+  };
+
+  const renderStatusBadge = (
+    status: MediaStatus,
+    requestStatus?: MediaRequestStatus
+  ) => {
     if (status === MediaStatus.AVAILABLE) {
       return (
         <Badge badgeType="success">
@@ -290,7 +304,7 @@ const SeriesRequestModal = ({
     }
     if (
       status === MediaStatus.PROCESSING ||
-      request?.status === MediaRequestStatus.APPROVED
+      requestStatus === MediaRequestStatus.APPROVED
     ) {
       return (
         <Badge badgeType="primary">
@@ -298,7 +312,7 @@ const SeriesRequestModal = ({
         </Badge>
       );
     }
-    if (status === MediaStatus.PENDING || request) {
+    if (status === MediaStatus.PENDING || requestStatus !== undefined) {
       return (
         <Badge badgeType="warning">
           {intl.formatMessage(globalMessages.pending)}
@@ -307,6 +321,12 @@ const SeriesRequestModal = ({
     }
     return <Badge>{intl.formatMessage(globalMessages.notrequested)}</Badge>;
   };
+
+  const statusBadge = (bookId: number, is4k: boolean) =>
+    renderStatusBadge(
+      bookStatus(bookId, is4k),
+      bookRequest(bookId, is4k)?.status
+    );
 
   const allBooksToggle = () => (
     <div
@@ -483,28 +503,48 @@ const SeriesRequestModal = ({
               <table className="min-w-full">
                 <thead>
                   <tr>
+                    <th className="w-16 bg-gray-700/80 px-4 py-3">
+                      {allBooksToggle()}
+                    </th>
+                    <th className="bg-gray-700/80 px-1 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
+                      {intl.formatMessage(messages.fullseries)}
+                    </th>
+                    <th className="bg-gray-700/80 px-2 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200 md:px-6">
+                      {intl.formatMessage(globalMessages.status)}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {visibleFormats.map((is4k) => (
+                    <tr key={`series-format-${is4k}`}>
+                      <td className="whitespace-nowrap px-4 py-4 text-sm font-medium leading-5 text-gray-100">
+                        {columnToggle(is4k)}
+                      </td>
+                      <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
+                        {intl.formatMessage(
+                          is4k ? messages.audiobook : messages.ebook
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap py-4 pr-2 text-sm leading-5 text-gray-200 md:px-6">
+                        {renderStatusBadge(seriesFormatStatus(is4k))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col">
+        <div className="-mx-4 sm:mx-0">
+          <div className="inline-block min-w-full py-2 align-middle">
+            <div className="overflow-hidden border border-gray-700 shadow backdrop-blur sm:rounded-lg">
+              <table className="min-w-full">
+                <thead>
+                  <tr>
                     <th className="bg-gray-700/80 px-4 py-3 text-left text-xs font-medium uppercase leading-4 tracking-wider text-gray-200">
-                      <div className="flex items-center gap-2">
-                        {allBooksToggle()}
-                        <span>{intl.formatMessage(messages.fullseries)}</span>
-                      </div>
-                      <div className="my-3 border-t border-gray-600" />
-                      <div>{intl.formatMessage(messages.formats)}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
-                        {visibleFormats.map((is4k) => (
-                          <div
-                            key={`series-format-head-${is4k}`}
-                            className="flex items-center gap-2"
-                          >
-                            {columnToggle(is4k)}
-                            <span>
-                              {intl.formatMessage(
-                                is4k ? messages.audiobook : messages.ebook
-                              )}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      {intl.formatMessage(globalMessages.books)}
                     </th>
                   </tr>
                 </thead>
