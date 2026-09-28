@@ -146,14 +146,21 @@ const SeriesRequestModal = ({
     .map((book) => book.id);
 
   const bookExcluded = (bookId: number) => excludedBooks.includes(bookId);
-  const bookIncluded = (bookId: number) => !bookExcluded(bookId);
 
-  const anyBookIncluded = selectableBooks.some(bookIncluded);
+  // Switched on and holding a format is what puts a book in the request, so
+  // clearing the formats above reads through to every book's own switch
+  const bookRequested = (bookId: number) =>
+    !bookExcluded(bookId) && formatsForBook(bookId).length > 0;
 
-  // A book switched off contributes nothing, whatever its formats still say
-  const selectedBookIds = selectableBooks.filter(
-    (bookId) => bookIncluded(bookId) && formatsForBook(bookId).length > 0
+  // A book with nothing left to request shows on, and shows what it already has
+  const bookToggleOn = (bookId: number) =>
+    bookRequested(bookId) || !bookSelectable(bookId);
+
+  const anyBookIncluded = selectableBooks.some(
+    (bookId) => !bookExcluded(bookId)
   );
+
+  const selectedBookIds = selectableBooks.filter(bookRequested);
 
   const selectedFormats = visibleFormats.filter((is4k) =>
     selectedBookIds.some((bookId) => isSelected(bookId, is4k))
@@ -219,7 +226,7 @@ const SeriesRequestModal = ({
     if (!bookSelectable(bookId)) {
       return;
     }
-    if (!bookExcluded(bookId)) {
+    if (bookRequested(bookId)) {
       setExcludedBooks([...new Set([...excludedBooks, bookId])]);
       return;
     }
@@ -230,12 +237,16 @@ const SeriesRequestModal = ({
     if (!formatsForBook(bookId).length) {
       const restored = { ...bookFormats };
       delete restored[bookId];
+      // Nothing to fall back on when the formats above are off too
+      if (!activeFormats.some((is4k) => isRequestable(bookId, is4k))) {
+        restored[bookId] = requestableFormatsFor(bookId);
+      }
       setBookFormats(restored);
     }
   };
 
   const allBooksIncluded =
-    selectableBooks.length > 0 && selectableBooks.every(bookIncluded);
+    selectableBooks.length > 0 && selectableBooks.every(bookRequested);
 
   // Only decides which books are in; the chosen formats are left untouched
   const toggleAllBooks = () => {
@@ -250,6 +261,9 @@ const SeriesRequestModal = ({
       return;
     }
     setExcludedBooks([]);
+    if (!activeFormats.length) {
+      setHeaderFormats(visibleFormats);
+    }
     const restored = { ...bookFormats };
     Object.keys(restored).forEach((key) => {
       if (!restored[Number(key)].length) {
@@ -353,7 +367,7 @@ const SeriesRequestModal = ({
       className={bookSelectable(bookId) ? '' : 'pointer-events-none opacity-50'}
     >
       <SlideCheckbox
-        checked={bookIncluded(bookId) || !bookSelectable(bookId)}
+        checked={bookToggleOn(bookId)}
         onClick={() => toggleBook(bookId)}
       />
     </div>
@@ -560,7 +574,7 @@ const SeriesRequestModal = ({
                     .map((book) => (
                       <tr key={`book-${book.id}`}>
                         <td className="px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                          <div className="mx-auto w-fit">
+                          <div>
                             <div className="flex">
                               <div className="w-10 flex-shrink-0">
                                 <CachedImage
@@ -577,7 +591,7 @@ const SeriesRequestModal = ({
                                   height={900}
                                 />
                               </div>
-                              <div className="flex max-w-[13rem] flex-col justify-center pl-2">
+                              <div className="flex flex-col justify-center pl-2">
                                 <div className="text-xs font-medium">
                                   {book.releaseDate?.slice(0, 4)}
                                   {book.position && ` - #${book.position}`}
@@ -588,15 +602,26 @@ const SeriesRequestModal = ({
                               </div>
                             </div>
                             <div className="mt-3 flex items-center gap-3">
-                              {bookToggle(book.id)}
-                              <div className="self-stretch border-l border-gray-600" />
-                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
-                                {visibleFormats.map((is4k) => (
-                                  <div key={`book-${book.id}-format-${is4k}`}>
-                                    {formatToggle(book.id, is4k)}
-                                  </div>
-                                ))}
+                              <div className="flex items-center gap-2">
+                                {bookToggle(book.id)}
+                                <span className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                                  {intl.formatMessage(globalMessages.request)}
+                                </span>
                               </div>
+                              {bookToggleOn(book.id) && (
+                                <>
+                                  <div className="self-stretch border-l border-gray-600" />
+                                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
+                                    {visibleFormats.map((is4k) => (
+                                      <div
+                                        key={`book-${book.id}-format-${is4k}`}
+                                      >
+                                        {formatToggle(book.id, is4k)}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         </td>
