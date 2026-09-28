@@ -156,6 +156,10 @@ const SeriesRequestModal = ({
   const bookToggleOn = (bookId: number) =>
     bookRequested(bookId) || !bookSelectable(bookId);
 
+  // Nothing chosen above for this book to take leaves its switch nothing to do
+  const bookActionable = (bookId: number) =>
+    bookSelectable(bookId) && formatsForBook(bookId).length > 0;
+
   const anyBookIncluded = selectableBooks.some(
     (bookId) => !bookExcluded(bookId)
   );
@@ -223,7 +227,7 @@ const SeriesRequestModal = ({
 
   // Switching a book off leaves its formats alone; it is simply not requested
   const toggleBook = (bookId: number) => {
-    if (!bookSelectable(bookId)) {
+    if (!bookActionable(bookId)) {
       return;
     }
     if (bookRequested(bookId)) {
@@ -234,13 +238,10 @@ const SeriesRequestModal = ({
       return;
     }
     setExcludedBooks(excludedBooks.filter((id) => id !== bookId));
-    if (!formatsForBook(bookId).length) {
+    if (bookFormats[bookId] && !formatsForBook(bookId).length) {
+      // An emptied book rejoins the formats chosen above
       const restored = { ...bookFormats };
       delete restored[bookId];
-      // Nothing to fall back on when the formats above are off too
-      if (!activeFormats.some((is4k) => isRequestable(bookId, is4k))) {
-        restored[bookId] = requestableFormatsFor(bookId);
-      }
       setBookFormats(restored);
     }
   };
@@ -364,7 +365,7 @@ const SeriesRequestModal = ({
 
   const bookToggle = (bookId: number) => (
     <div
-      className={bookSelectable(bookId) ? '' : 'pointer-events-none opacity-50'}
+      className={bookActionable(bookId) ? '' : 'pointer-events-none opacity-50'}
     >
       <SlideCheckbox
         checked={bookToggleOn(bookId)}
