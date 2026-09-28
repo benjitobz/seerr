@@ -182,9 +182,8 @@ class ImageProxy {
         }
       }
 
-      // If there's a transform, serve the raw image now and optimize in background
       if (this.transform && newImage.meta.cacheMiss) {
-        this.optimizeAndCache(newImage, cacheKey);
+        return (await this.optimizeAndCache(newImage, cacheKey)) ?? newImage;
       }
 
       return newImage;
@@ -211,8 +210,8 @@ class ImageProxy {
   private async optimizeAndCache(
     image: ImageResponse,
     cacheKey: string
-  ): Promise<void> {
-    if (!this.transform) return;
+  ): Promise<ImageResponse | null> {
+    if (!this.transform) return null;
 
     try {
       const { buffer, extension } = await this.transform(image.imageBuffer);
@@ -227,11 +226,15 @@ class ImageProxy {
         buffer,
         image.meta.etag
       );
+
+      return { meta: { ...image.meta, extension }, imageBuffer: buffer };
     } catch (e) {
-      logger.debug('Failed to optimize image in background.', {
+      logger.debug('Failed to optimize image.', {
         label: 'Image Cache',
         errorMessage: e.message,
       });
+
+      return null;
     }
   }
 
