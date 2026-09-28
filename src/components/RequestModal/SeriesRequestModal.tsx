@@ -145,15 +145,15 @@ const SeriesRequestModal = ({
     .filter((book) => bookSelectable(book.id))
     .map((book) => book.id);
 
-  const anyBookHasFormats = selectableBooks.some(
-    (bookId) => formatsForBook(bookId).length > 0
+  const bookExcluded = (bookId: number) => excludedBooks.includes(bookId);
+  const bookIncluded = (bookId: number) => !bookExcluded(bookId);
+
+  const anyBookIncluded = selectableBooks.some(bookIncluded);
+
+  // A book switched off contributes nothing, whatever its formats still say
+  const selectedBookIds = selectableBooks.filter(
+    (bookId) => bookIncluded(bookId) && formatsForBook(bookId).length > 0
   );
-
-  // Switched off, or left without a format, means the book is not requested
-  const bookIncluded = (bookId: number) =>
-    !excludedBooks.includes(bookId) && formatsForBook(bookId).length > 0;
-
-  const selectedBookIds = selectableBooks.filter(bookIncluded);
 
   const selectedFormats = visibleFormats.filter((is4k) =>
     selectedBookIds.some((bookId) => isSelected(bookId, is4k))
@@ -181,12 +181,12 @@ const SeriesRequestModal = ({
 
   // Changing a book's formats detaches that book from the header choice
   const toggle = (bookId: number, is4k: boolean) => {
-    if (!isRequestable(bookId, is4k)) {
+    if (!isRequestable(bookId, is4k) || bookExcluded(bookId)) {
       return;
     }
     const current = formatsForBook(bookId);
     const adding = !current.includes(is4k);
-    if (adding && !bookIncluded(bookId) && wouldExceedQuota(bookId)) {
+    if (adding && wouldExceedQuota(bookId)) {
       return;
     }
     setBookFormats({
@@ -195,9 +195,6 @@ const SeriesRequestModal = ({
         ? [...current, is4k]
         : current.filter((format) => format !== is4k),
     });
-    if (adding) {
-      setExcludedBooks(excludedBooks.filter((id) => id !== bookId));
-    }
   };
 
   const formatColumn = (is4k: boolean) =>
@@ -207,7 +204,7 @@ const SeriesRequestModal = ({
 
   // Every book that was not changed individually follows this
   const toggleColumn = (is4k: boolean) => {
-    if (!formatColumn(is4k).length) {
+    if (!formatColumn(is4k).length || !anyBookIncluded) {
       return;
     }
     setHeaderFormats(
@@ -222,7 +219,7 @@ const SeriesRequestModal = ({
     if (!bookSelectable(bookId)) {
       return;
     }
-    if (bookIncluded(bookId)) {
+    if (!bookExcluded(bookId)) {
       setExcludedBooks([...new Set([...excludedBooks, bookId])]);
       return;
     }
@@ -330,11 +327,7 @@ const SeriesRequestModal = ({
 
   const allBooksToggle = () => (
     <div
-      className={
-        selectableBooks.length && anyBookHasFormats
-          ? ''
-          : 'pointer-events-none opacity-50'
-      }
+      className={selectableBooks.length ? '' : 'pointer-events-none opacity-50'}
     >
       <SlideCheckbox checked={allBooksIncluded} onClick={toggleAllBooks} />
     </div>
@@ -343,11 +336,13 @@ const SeriesRequestModal = ({
   const columnToggle = (is4k: boolean) => (
     <div
       className={
-        formatColumn(is4k).length ? '' : 'pointer-events-none opacity-50'
+        formatColumn(is4k).length && anyBookIncluded
+          ? ''
+          : 'pointer-events-none opacity-50'
       }
     >
       <SlideCheckbox
-        checked={isWholeColumn(is4k)}
+        checked={anyBookIncluded && isWholeColumn(is4k)}
         onClick={() => toggleColumn(is4k)}
       />
     </div>
@@ -366,12 +361,17 @@ const SeriesRequestModal = ({
 
   const formatToggle = (bookId: number, is4k: boolean) => {
     const selectable = isRequestable(bookId, is4k);
+    const locked = bookExcluded(bookId);
 
     return (
       <div className="flex items-center gap-2">
-        <div className={selectable ? '' : 'pointer-events-none opacity-50'}>
+        <div
+          className={
+            selectable && !locked ? '' : 'pointer-events-none opacity-50'
+          }
+        >
           <SlideCheckbox
-            checked={isSelected(bookId, is4k) || !selectable}
+            checked={!locked && (isSelected(bookId, is4k) || !selectable)}
             onClick={() => toggle(bookId, is4k)}
           />
         </div>
@@ -560,7 +560,6 @@ const SeriesRequestModal = ({
                     .map((book) => (
                       <tr key={`book-${book.id}`}>
                         <td className="px-4 py-4 text-sm font-medium leading-5 text-gray-100">
-                          <div className="mb-2">{bookToggle(book.id)}</div>
                           <div className="mx-auto w-fit">
                             <div className="flex">
                               <div className="w-10 flex-shrink-0">
@@ -588,12 +587,16 @@ const SeriesRequestModal = ({
                                 </div>
                               </div>
                             </div>
-                            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
-                              {visibleFormats.map((is4k) => (
-                                <div key={`book-${book.id}-format-${is4k}`}>
-                                  {formatToggle(book.id, is4k)}
-                                </div>
-                              ))}
+                            <div className="mt-3 flex items-center gap-3">
+                              {bookToggle(book.id)}
+                              <div className="self-stretch border-l border-gray-600" />
+                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
+                                {visibleFormats.map((is4k) => (
+                                  <div key={`book-${book.id}-format-${is4k}`}>
+                                    {formatToggle(book.id, is4k)}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </td>
