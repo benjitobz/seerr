@@ -152,10 +152,6 @@ const SeriesRequestModal = ({
   const bookRequested = (bookId: number) =>
     !bookExcluded(bookId) && formatsForBook(bookId).length > 0;
 
-  // A book with nothing left to request shows on, and shows what it already has
-  const bookToggleOn = (bookId: number) =>
-    bookRequested(bookId) || !bookSelectable(bookId);
-
   const anyBookIncluded = selectableBooks.some(
     (bookId) => !bookExcluded(bookId)
   );
@@ -367,7 +363,7 @@ const SeriesRequestModal = ({
       className={bookSelectable(bookId) ? '' : 'pointer-events-none opacity-50'}
     >
       <SlideCheckbox
-        checked={bookToggleOn(bookId)}
+        checked={bookRequested(bookId)}
         onClick={() => toggleBook(bookId)}
       />
     </div>
@@ -602,13 +598,8 @@ const SeriesRequestModal = ({
                               </div>
                             </div>
                             <div className="mt-3 flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                {bookToggle(book.id)}
-                                <span className="text-xs font-medium uppercase tracking-wider text-gray-400">
-                                  {intl.formatMessage(globalMessages.request)}
-                                </span>
-                              </div>
-                              {bookToggleOn(book.id) && (
+                              {bookToggle(book.id)}
+                              {bookRequested(book.id) && (
                                 <>
                                   <div className="self-stretch border-l border-gray-600" />
                                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
