@@ -23,6 +23,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.SeriesDetails', {
   overview: 'Overview',
+  editionsextras: 'Editions & Extras',
   numberofbooks: '{count} Books',
   requestseries: 'Request Series',
   requestseriesaudio: 'Request Series in Audiobook',
@@ -93,18 +94,22 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
     return <Error statusCode={404} />;
   }
 
+  // Editions and extras are listed on their own and left out of the series status
+  const primaryBooks = data.books.filter((book) => !book.extra);
+  const extraBooks = data.books.filter((book) => book.extra);
+
   let collectionStatus = MediaStatus.UNKNOWN;
   let collectionStatusAudio = MediaStatus.UNKNOWN;
 
   if (
-    data.books.every(
+    primaryBooks.every(
       (book) =>
         book.mediaInfo && book.mediaInfo.status === MediaStatus.AVAILABLE
     )
   ) {
     collectionStatus = MediaStatus.AVAILABLE;
   } else if (
-    data.books.some(
+    primaryBooks.some(
       (book) =>
         book.mediaInfo && book.mediaInfo.status === MediaStatus.AVAILABLE
     )
@@ -113,14 +118,14 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
   }
 
   if (
-    data.books.every(
+    primaryBooks.every(
       (book) =>
         book.mediaInfo && book.mediaInfo.status4k === MediaStatus.AVAILABLE
     )
   ) {
     collectionStatusAudio = MediaStatus.AVAILABLE;
   } else if (
-    data.books.some(
+    primaryBooks.some(
       (book) =>
         book.mediaInfo && book.mediaInfo.status4k === MediaStatus.AVAILABLE
     )
@@ -150,8 +155,31 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
 
   collectionAttributes.push(
     intl.formatMessage(messages.numberofbooks, {
-      count: data.books.length,
+      count: primaryBooks.length,
     })
+  );
+
+  const bookCards = (list: Series['books']) => (
+    <ul className="cards-vertical">
+      {list.map((book, index) => (
+        <li key={`list-cast-item-${book.id}-${index}`}>
+          <TitleCard
+            key={book.id}
+            id={book.id}
+            title={book.title}
+            year={book.releaseDate}
+            image={book.posterPath}
+            summary={book.overview}
+            position={book.position}
+            mediaType={'book'}
+            status={book.mediaInfo?.status}
+            status4k={book.mediaInfo?.status4k}
+            mediaRequests={book.mediaInfo?.requests}
+            canExpand
+          />
+        </li>
+      ))}
+    </ul>
   );
 
   return (
@@ -282,28 +310,17 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
           <span>{intl.formatMessage(globalMessages.books)}</span>
         </div>
       </div>
-      <ul className="cards-vertical">
-        {data.books?.map((book, index) => {
-          return (
-            <li key={`list-cast-item-${book.id}-${index}`}>
-              <TitleCard
-                key={book.id}
-                id={book.id}
-                title={book.title}
-                year={book.releaseDate}
-                image={book.posterPath}
-                summary={book.overview}
-                position={book.position}
-                mediaType={'book'}
-                status={book.mediaInfo?.status}
-                status4k={book.mediaInfo?.status4k}
-                mediaRequests={book.mediaInfo?.requests}
-                canExpand
-              />
-            </li>
-          );
-        })}
-      </ul>
+      {bookCards(primaryBooks)}
+      {extraBooks.length > 0 && (
+        <>
+          <div className="slider-header">
+            <div className="slider-title">
+              <span>{intl.formatMessage(messages.editionsextras)}</span>
+            </div>
+          </div>
+          {bookCards(extraBooks)}
+        </>
+      )}
       <div className="extra-bottom-space relative" />
     </div>
   );
