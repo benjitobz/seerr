@@ -376,7 +376,7 @@ const SeriesRequestModal = ({
 
   const formatToggle = (bookId: number, is4k: boolean) => {
     const selectable = isRequestable(bookId, is4k);
-    const locked = bookExcluded(bookId);
+    const locked = !bookToggleOn(bookId);
 
     return (
       <div className="flex items-center gap-2">
@@ -604,20 +604,14 @@ const SeriesRequestModal = ({
                             </div>
                             <div className="mt-3 flex items-center gap-3">
                               {bookToggle(book.id)}
-                              {bookToggleOn(book.id) && (
-                                <>
-                                  <div className="self-stretch border-l border-gray-600" />
-                                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
-                                    {visibleFormats.map((is4k) => (
-                                      <div
-                                        key={`book-${book.id}-format-${is4k}`}
-                                      >
-                                        {formatToggle(book.id, is4k)}
-                                      </div>
-                                    ))}
+                              <div className="self-stretch border-l border-gray-600" />
+                              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-x-6">
+                                {visibleFormats.map((is4k) => (
+                                  <div key={`book-${book.id}-format-${is4k}`}>
+                                    {formatToggle(book.id, is4k)}
                                   </div>
-                                </>
-                              )}
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </td>
