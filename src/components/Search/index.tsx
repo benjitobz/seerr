@@ -40,7 +40,7 @@ const Search = () => {
       query: router.query.query,
       type: router.query.type,
     },
-    { hideAvailable: false, hideBlocklisted: false }
+    { hideAvailable: false, hideBlocklisted: false, hideRequested: false }
   );
 
   if ((error as any)?.response?.status === 503) {
