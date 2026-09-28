@@ -50,6 +50,7 @@ export interface BookResult {
   posterPath?: string;
   backdropPath?: string;
   position?: number;
+  extra?: boolean;
   mediaInfo?: Media;
 }
 
