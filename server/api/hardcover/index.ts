@@ -28,11 +28,22 @@ import type {
   Tags,
 } from './interfaces';
 
+export const BookSortOptionsIterable = [
+  'popularity.desc',
+  'popularity.asc',
+  'release_date.desc',
+  'release_date.asc',
+  'original_title.asc',
+  'original_title.desc',
+] as const;
+
+export type BookSortOptions = (typeof BookSortOptionsIterable)[number];
+
 interface DiscoverBookOptions {
   genres?: string[];
   releaseDateGte?: string;
   releaseDateLte?: string;
-  sortBy?: string;
+  sortBy?: BookSortOptions;
   page?: number;
 }
 
@@ -297,7 +308,7 @@ class Hardcover extends ExternalAPI {
         );
       }
 
-      const orderMap: Record<string, string> = {
+      const orderMap: Record<BookSortOptions, string> = {
         'popularity.asc': '{users_count: asc}',
         'popularity.desc': '{users_count: desc}',
         'release_date.asc': '{release_date: asc}',
@@ -311,7 +322,7 @@ class Hardcover extends ExternalAPI {
           query DiscoverBooksFiltered($limit: Int!, $offset: Int!) {
             books(
               where: {_and: [${conditions.join(', ')}]}
-              order_by: ${orderMap[sortBy ?? ''] ?? '{users_count: desc}'}
+              order_by: ${orderMap[sortBy ?? 'popularity.desc']}
               limit: $limit
               offset: $offset
             ) {

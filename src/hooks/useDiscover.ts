@@ -19,6 +19,7 @@ interface BaseMedia {
   mediaType: string;
   mediaInfo?: {
     status: MediaStatus;
+    hasActiveRequest?: boolean;
   };
 }
 
@@ -58,7 +59,7 @@ const useDiscover = <
 >(
   endpoint: string,
   options?: O,
-  { hideAvailable = true, hideBlocklisted = true } = {}
+  { hideAvailable = true, hideBlocklisted = true, hideRequested = true } = {}
 ): DiscoverResult<T, S> => {
   const settings = useSettings();
   const { hasPermission } = useUser();
@@ -124,11 +125,13 @@ const useDiscover = <
   if (settings.currentSettings.hideAvailable && hideAvailable) {
     titles = titles.filter(
       (i) =>
-        (i.mediaType === 'movie' ||
+        !(
+          i.mediaType === 'movie' ||
           i.mediaType === 'tv' ||
-          i.mediaType === 'book') &&
-        i.mediaInfo?.status !== MediaStatus.AVAILABLE &&
-        i.mediaInfo?.status !== MediaStatus.PARTIALLY_AVAILABLE
+          i.mediaType === 'book'
+        ) ||
+        (i.mediaInfo?.status !== MediaStatus.AVAILABLE &&
+          i.mediaInfo?.status !== MediaStatus.PARTIALLY_AVAILABLE)
     );
   }
 
@@ -139,11 +142,22 @@ const useDiscover = <
   ) {
     titles = titles.filter(
       (i) =>
-        (i.mediaType === 'movie' ||
+        !(
+          i.mediaType === 'movie' ||
           i.mediaType === 'tv' ||
-          i.mediaType === 'book') &&
-        i.mediaInfo?.status !== MediaStatus.BLOCKLISTED
+          i.mediaType === 'book'
+        ) || i.mediaInfo?.status !== MediaStatus.BLOCKLISTED
     );
+  }
+
+  if (settings.currentSettings.hideRequested && hideRequested) {
+    titles = titles.filter((i) => {
+      if (i.mediaType !== 'movie' && i.mediaType !== 'tv') {
+        return true;
+      }
+
+      return !i.mediaInfo?.hasActiveRequest;
+    });
   }
 
   const isEmpty = !isLoadingInitialData && titles?.length === 0;
