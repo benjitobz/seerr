@@ -355,6 +355,7 @@
   "components.ManageSlideOver.manageModalMedia": "Media",
   "components.ManageSlideOver.manageModalMedia4k": "4K Media",
   "components.ManageSlideOver.manageModalMediaAudiobook": "Audiobook Media",
+  "components.ManageSlideOver.manageModalMediaEbook": "Ebook Media",
   "components.ManageSlideOver.manageModalNoRequests": "No requests.",
   "components.ManageSlideOver.manageModalRemoveMediaWarning": "* This will irreversibly remove this {mediaType} from {arr}, including all files.",
   "components.ManageSlideOver.manageModalRequests": "Requests",

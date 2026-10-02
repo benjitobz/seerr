@@ -60,6 +60,7 @@ const messages = defineMessages('components.ManageSlideOver', {
   manageModalMedia: 'Media',
   manageModalMedia4k: '4K Media',
   manageModalMediaAudiobook: 'Audiobook Media',
+  manageModalMediaEbook: 'Ebook Media',
   manageModalAdvanced: 'Advanced',
   manageModalNoRequests: 'No requests.',
   manageModalClearMedia: 'Clear Data',
@@ -232,6 +233,15 @@ const ManageSlideOver = ({
               radarr.id === data.mediaInfo?.serviceId4k
           ) !== undefined
         );
+      } else if (data.mediaInfo.mediaType === MediaType.BOOK) {
+        return (
+          readarrData?.find(
+            (readarr) =>
+              readarr.isDefault &&
+              readarr.is4k &&
+              readarr.id === data.mediaInfo?.serviceId4k
+          ) !== undefined
+        );
       } else {
         return (
           sonarrData?.find(
@@ -398,7 +408,11 @@ const ManageSlideOver = ({
             watchData?.data) && (
             <div>
               <h3 className="mb-2 text-xl font-bold">
-                {intl.formatMessage(messages.manageModalMedia)}
+                {intl.formatMessage(
+                  mediaType === 'book'
+                    ? messages.manageModalMediaEbook
+                    : messages.manageModalMedia
+                )}
               </h3>
               <div className="space-y-2">
                 {(watchData?.data || data.mediaInfo?.tautulliUrl) && (
