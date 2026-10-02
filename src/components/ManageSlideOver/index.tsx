@@ -73,7 +73,8 @@ const messages = defineMessages('components.ManageSlideOver', {
   openarr4k: 'Open in 4K {arr}',
   removearr4k: 'Remove from 4K {arr}',
   openarraudiobook: 'Open in Audiobook {arr}',
-  removearraudiobook: 'Remove from Audiobook {arr}',
+  removearraudiobook: 'Remove Audiobook from {arr}',
+  removearrebook: 'Remove Ebook from {arr}',
   clearmediadataerror: 'Something went wrong while clearing the media data.',
   removemediaerror: 'Something went wrong while removing the media.',
   downloadstatus: 'Downloads',
@@ -548,14 +549,19 @@ const ManageSlideOver = ({
                       >
                         <TrashIcon />
                         <span>
-                          {intl.formatMessage(messages.removearr, {
-                            arr:
-                              mediaType === 'movie'
-                                ? 'Radarr'
-                                : mediaType === 'tv'
-                                  ? 'Sonarr'
-                                  : 'Readarr',
-                          })}
+                          {intl.formatMessage(
+                            mediaType === 'book'
+                              ? messages.removearrebook
+                              : messages.removearr,
+                            {
+                              arr:
+                                mediaType === 'movie'
+                                  ? 'Radarr'
+                                  : mediaType === 'tv'
+                                    ? 'Sonarr'
+                                    : 'Readarr',
+                            }
+                          )}
                         </span>
                       </ConfirmButton>
                       <div className="mt-1 text-xs text-gray-400">
