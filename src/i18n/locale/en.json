@@ -332,6 +332,8 @@
   "components.ManageSlideOver.plays": "<strong>{playCount, number}</strong> {playCount, plural, one {play} other {plays}}",
   "components.ManageSlideOver.removearr": "Remove from {arr}",
   "components.ManageSlideOver.removearr4k": "Remove from 4K {arr}",
+  "components.ManageSlideOver.removearraudiobook": "Remove Audiobook from {arr}",
+  "components.ManageSlideOver.removearrebook": "Remove Ebook from {arr}",
   "components.ManageSlideOver.removemediaerror": "Something went wrong while removing the media.",
   "components.ManageSlideOver.tvshow": "series",
   "components.MediaSlider.ShowMoreCard.seemore": "See More",
