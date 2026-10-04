@@ -98,6 +98,18 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
   const primaryBooks = data.books.filter((book) => !book.extra);
   const extraBooks = data.books.filter((book) => book.extra);
 
+  const seriesCovers = [
+    ...new Set(
+      [...primaryBooks]
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map((book) => book.posterPath)
+        .filter(
+          (cover): cover is string =>
+            !!cover && !cover.includes('/static/covers/')
+        )
+    ),
+  ];
+
   let collectionStatus = MediaStatus.UNKNOWN;
   let collectionStatusAudio = MediaStatus.UNKNOWN;
 
@@ -219,22 +231,40 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
       />
       <div className="media-header">
         <div className="media-poster">
-          <CachedImage
-            type="hardcover"
-            src={
-              data.posterPath
-                ? data.posterPath
-                : `https://assets.hardcover.app/static/covers/cover${
-                    (data.id % 9) + 1
-                  }.png`
-            }
-            alt=""
-            sizes="100vw"
-            style={{ width: '100%', height: 'auto' }}
-            width={600}
-            height={900}
-            priority
-          />
+          {seriesCovers.length >= 4 ? (
+            <div className="grid grid-cols-2">
+              {seriesCovers.slice(0, 4).map((cover) => (
+                <CachedImage
+                  key={cover}
+                  type="hardcover"
+                  src={cover}
+                  alt=""
+                  sizes="50vw"
+                  style={{ width: '100%', height: 'auto' }}
+                  width={300}
+                  height={450}
+                  priority
+                />
+              ))}
+            </div>
+          ) : (
+            <CachedImage
+              type="hardcover"
+              src={
+                seriesCovers[0] ??
+                data.posterPath ??
+                `https://assets.hardcover.app/static/covers/cover${
+                  (data.id % 9) + 1
+                }.png`
+              }
+              alt=""
+              sizes="100vw"
+              style={{ width: '100%', height: 'auto' }}
+              width={600}
+              height={900}
+              priority
+            />
+          )}
         </div>
         <div className="media-title">
           <div className="media-status">
