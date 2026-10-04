@@ -1509,6 +1509,8 @@
   "components.StatusBadge.status4k": "4K {status}",
   "components.StatusBadge.statusAudiobook": "Audiobook {status}",
   "components.StatusBadge.statusEbook": "Ebook {status}",
+  "components.StatusBadge.statusSeriesAudiobooks": "Series Audiobooks {status}",
+  "components.StatusBadge.statusSeriesEbooks": "Series Ebooks {status}",
   "components.StatusChecker.appUpdated": "{applicationTitle} Updated",
   "components.StatusChecker.appUpdatedDescription": "Please click the button below to reload the application.",
   "components.StatusChecker.reloadApp": "Reload {applicationTitle}",

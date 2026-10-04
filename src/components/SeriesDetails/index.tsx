@@ -220,7 +220,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                 className="absolute inset-0"
                 style={{
                   backgroundImage:
-                    'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
+                    'linear-gradient(180deg, rgba(17, 24, 39, 0.75) 0%, rgba(17, 24, 39, 1) 100%)',
                 }}
               />
             </div>
@@ -297,6 +297,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
               title={titles}
               mediaType={MediaType.BOOK}
               alwaysLabelFormat
+              seriesLabel
               inProgress={data.books.some(
                 (book) => (book.mediaInfo?.downloadStatus ?? []).length > 0
               )}
@@ -315,6 +316,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                   is4k
                   mediaType={MediaType.BOOK}
                   alwaysLabelFormat
+                  seriesLabel
                   inProgress={data.books.some(
                     (book) =>
                       (book.mediaInfo?.downloadStatus4k ?? []).length > 0
