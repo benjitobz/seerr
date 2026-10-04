@@ -203,19 +203,42 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
     >
       {data.books && (
         <div className="media-page-bg-image">
-          <ImageFader
-            isDarker
-            cache={'hardcover'}
-            backgroundImages={(
-              [
-                ...new Set(
-                  (data.books ?? [])
-                    .filter((media) => media.backdropPath)
-                    .map((media) => media.backdropPath)
-                ),
-              ] as string[]
-            ).slice(0, 6)}
-          />
+          {seriesCovers.length >= 3 ? (
+            <div className="absolute-top-shift absolute inset-0 flex overflow-hidden">
+              {seriesCovers.map((cover) => (
+                <div key={cover} className="relative min-w-[5rem] flex-1">
+                  <CachedImage
+                    type="hardcover"
+                    src={cover}
+                    alt=""
+                    style={{ objectFit: 'cover' }}
+                    fill
+                  />
+                </div>
+              ))}
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
+                }}
+              />
+            </div>
+          ) : (
+            <ImageFader
+              isDarker
+              cache={'hardcover'}
+              backgroundImages={(
+                [
+                  ...new Set(
+                    (data.books ?? [])
+                      .filter((media) => media.backdropPath)
+                      .map((media) => media.backdropPath)
+                  ),
+                ] as string[]
+              ).slice(0, 6)}
+            />
+          )}
         </div>
       )}
       <PageTitle title={data.name} />
