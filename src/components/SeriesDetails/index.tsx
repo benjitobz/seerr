@@ -297,6 +297,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
               title={titles}
               mediaType={MediaType.BOOK}
               alwaysLabelFormat
+              seriesLabel
               inProgress={data.books.some(
                 (book) => (book.mediaInfo?.downloadStatus ?? []).length > 0
               )}
@@ -315,6 +316,7 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
                   is4k
                   mediaType={MediaType.BOOK}
                   alwaysLabelFormat
+                  seriesLabel
                   inProgress={data.books.some(
                     (book) =>
                       (book.mediaInfo?.downloadStatus4k ?? []).length > 0
