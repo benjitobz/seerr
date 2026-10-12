@@ -3,6 +3,7 @@ import AuthorCard from '@app/components/AuthorCard';
 import BlocklistModal from '@app/components/BlocklistModal';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
+import CoverBackdrop from '@app/components/Common/CoverBackdrop';
 import HardcoverSetup from '@app/components/Common/HardcoverSetup';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
@@ -29,6 +30,7 @@ import {
 import { IssueStatus } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import type { BookDetails as BookDetailsType } from '@server/models/Book';
+import type { Series } from '@server/models/Series';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -88,6 +90,9 @@ const BookDetails = ({ book }: BookDetailsProps) => {
       15000
     ),
   });
+  const { data: seriesData } = useSWR<Series>(
+    data?.series?.[0] ? `/api/v1/series/${data.series[0].series_id}` : null
+  );
 
   useEffect(() => {
     setShowManager(router.query.manage == '1' ? true : false);
@@ -126,6 +131,25 @@ const BookDetails = ({ book }: BookDetailsProps) => {
   if (!data) {
     return <ErrorPage statusCode={404} />;
   }
+
+  const seriesCovers = [
+    ...new Set(
+      (seriesData?.books ?? [])
+        .filter((book) => !book.extra)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+        .map((book) => book.posterPath)
+        .filter(
+          (cover): cover is string =>
+            !!cover && !cover.includes('/static/covers/')
+        )
+    ),
+  ];
+  const backdropCovers =
+    seriesCovers.length >= 3
+      ? seriesCovers
+      : data.posterPath.includes('/static/covers/')
+        ? []
+        : [data.posterPath];
 
   const onClickHideItemBtn = async (): Promise<void> => {
     setIsBlocklistUpdating(true);
@@ -211,21 +235,27 @@ const BookDetails = ({ book }: BookDetailsProps) => {
       }}
     >
       <div className="media-page-bg-image">
-        <CachedImage
-          type="hardcover"
-          alt=""
-          src={data.backdropPath}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          fill
-          priority
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-          }}
-        />
+        {backdropCovers.length ? (
+          <CoverBackdrop covers={backdropCovers} />
+        ) : (
+          <>
+            <CachedImage
+              type="hardcover"
+              alt=""
+              src={data.backdropPath}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              fill
+              priority
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
+              }}
+            />
+          </>
+        )}
       </div>
       <PageTitle title={data.title} />
       <IssueModal
