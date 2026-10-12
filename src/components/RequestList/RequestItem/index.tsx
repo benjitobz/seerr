@@ -3,6 +3,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
+import CoverRow from '@app/components/Common/CoverRow';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
@@ -14,6 +15,7 @@ import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
 } from '@app/utils/refreshIntervalHelper';
+import getSeriesCovers from '@app/utils/seriesCovers';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -27,6 +29,7 @@ import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { RequestResultsResponse } from '@server/interfaces/api/requestInterfaces';
 import type { BookDetails } from '@server/models/Book';
 import type { MovieDetails } from '@server/models/Movie';
+import type { Series } from '@server/models/Series';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import Link from 'next/link';
@@ -330,6 +333,12 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
   const { data: title, error } = useSWR<MovieDetails | TvDetails | BookDetails>(
     inView ? url : null
   );
+  const { data: series } = useSWR<Series>(
+    title && isBook(title) && title.series?.[0]
+      ? `/api/v1/series/${title.series[0].series_id}`
+      : null
+  );
+  const seriesCovers = getSeriesCovers(series);
   const { data: requestData, mutate: revalidate } = useSWR<
     NonFunctionProperties<MediaRequest>
   >(`/api/v1/request/${request.id}`, {
@@ -460,13 +469,17 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
           : !!title.backdropPath) && (
           <div className="absolute inset-0 z-0 w-full overflow-hidden bg-cover bg-center xl:w-2/3">
             {isBook(title) ? (
-              <CachedImage
-                type="hardcover"
-                src={title.posterPath}
-                alt=""
-                style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
-                fill
-              />
+              seriesCovers.length >= 3 ? (
+                <CoverRow covers={seriesCovers} />
+              ) : (
+                <CachedImage
+                  type="hardcover"
+                  src={title.posterPath}
+                  alt=""
+                  style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
+                  fill
+                />
+              )
             ) : (
               <CachedImage
                 type="tmdb"

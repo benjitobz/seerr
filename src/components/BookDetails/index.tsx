@@ -22,6 +22,7 @@ import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
+import getSeriesCovers from '@app/utils/seriesCovers';
 import {
   CogIcon,
   ExclamationTriangleIcon,
@@ -132,18 +133,7 @@ const BookDetails = ({ book }: BookDetailsProps) => {
     return <ErrorPage statusCode={404} />;
   }
 
-  const seriesCovers = [
-    ...new Set(
-      (seriesData?.books ?? [])
-        .filter((book) => !book.extra)
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-        .map((book) => book.posterPath)
-        .filter(
-          (cover): cover is string =>
-            !!cover && !cover.includes('/static/covers/')
-        )
-    ),
-  ];
+  const seriesCovers = getSeriesCovers(seriesData);
   const backdropCovers =
     seriesCovers.length >= 3
       ? seriesCovers
