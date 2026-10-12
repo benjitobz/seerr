@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
+import CoverBackdrop from '@app/components/Common/CoverBackdrop';
 import HardcoverSetup from '@app/components/Common/HardcoverSetup';
 import ImageFader from '@app/components/Common/ImageFader';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
@@ -203,27 +204,8 @@ const SeriesDetails = ({ series }: SeriesDetailsProps) => {
     >
       {data.books && (
         <div className="media-page-bg-image">
-          {seriesCovers.length >= 3 ? (
-            <div className="absolute-top-shift absolute inset-0 flex overflow-hidden">
-              {seriesCovers.map((cover) => (
-                <div key={cover} className="relative min-w-[5rem] flex-1">
-                  <CachedImage
-                    type="hardcover"
-                    src={cover}
-                    alt=""
-                    style={{ objectFit: 'cover' }}
-                    fill
-                  />
-                </div>
-              ))}
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(180deg, rgba(17, 24, 39, 0.75) 0%, rgba(17, 24, 39, 1) 100%)',
-                }}
-              />
-            </div>
+          {seriesCovers.length ? (
+            <CoverBackdrop covers={seriesCovers} />
           ) : (
             <ImageFader
               isDarker
