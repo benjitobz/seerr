@@ -1,4 +1,5 @@
 import CachedImage from '@app/components/Common/CachedImage';
+import CoverRow from '@app/components/Common/CoverRow';
 
 interface CoverBackdropProps {
   covers: string[];
@@ -12,17 +13,7 @@ const CoverBackdrop = ({ covers }: CoverBackdropProps) => {
   return (
     <div className="absolute-top-shift absolute inset-0 flex overflow-hidden">
       {covers.length >= 3 ? (
-        covers.map((cover) => (
-          <div key={cover} className="relative min-w-[5rem] flex-1">
-            <CachedImage
-              type="hardcover"
-              src={cover}
-              alt=""
-              style={{ objectFit: 'cover' }}
-              fill
-            />
-          </div>
-        ))
+        <CoverRow covers={covers} />
       ) : (
         <div className="relative flex-1">
           <CachedImage
