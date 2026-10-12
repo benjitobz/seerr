@@ -2,7 +2,6 @@ import Spinner from '@app/assets/spinner.svg';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
-import CoverTiles from '@app/components/Common/CoverTiles';
 import Tooltip from '@app/components/Common/Tooltip';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
@@ -383,7 +382,13 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
           : !!title.backdropPath) && (
           <div className="absolute inset-0 z-0 overflow-hidden">
             {isBook(title) ? (
-              <CoverTiles cover={title.posterPath} />
+              <CachedImage
+                type="hardcover"
+                src={title.posterPath}
+                alt=""
+                style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
+                fill
+              />
             ) : (
               <CachedImage
                 type="tmdb"
