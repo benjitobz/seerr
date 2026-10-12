@@ -29,8 +29,7 @@ const CoverBackdrop = ({ covers }: CoverBackdropProps) => {
             type="hardcover"
             src={covers[0]}
             alt=""
-            className="scale-125 blur-2xl"
-            style={{ objectFit: 'cover' }}
+            style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
             fill
           />
         </div>
