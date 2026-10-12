@@ -30,7 +30,6 @@ import {
 import { IssueStatus } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import type { BookDetails as BookDetailsType } from '@server/models/Book';
-import type { Series } from '@server/models/Series';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -90,9 +89,6 @@ const BookDetails = ({ book }: BookDetailsProps) => {
       15000
     ),
   });
-  const { data: seriesData } = useSWR<Series>(
-    data?.series?.[0] ? `/api/v1/series/${data.series[0].series_id}` : null
-  );
 
   useEffect(() => {
     setShowManager(router.query.manage == '1' ? true : false);
@@ -132,24 +128,9 @@ const BookDetails = ({ book }: BookDetailsProps) => {
     return <ErrorPage statusCode={404} />;
   }
 
-  const seriesCovers = [
-    ...new Set(
-      (seriesData?.books ?? [])
-        .filter((book) => !book.extra)
-        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-        .map((book) => book.posterPath)
-        .filter(
-          (cover): cover is string =>
-            !!cover && !cover.includes('/static/covers/')
-        )
-    ),
-  ];
-  const backdropCovers =
-    seriesCovers.length >= 3
-      ? seriesCovers
-      : data.posterPath.includes('/static/covers/')
-        ? []
-        : [data.posterPath];
+  const backdropCovers = data.posterPath.includes('/static/covers/')
+    ? []
+    : [data.posterPath];
 
   const onClickHideItemBtn = async (): Promise<void> => {
     setIsBlocklistUpdating(true);

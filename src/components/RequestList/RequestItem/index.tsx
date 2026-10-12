@@ -455,19 +455,28 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
         }}
       />
       <div className="relative flex w-full flex-col justify-between overflow-hidden rounded-xl bg-gray-800 py-2 text-gray-400 shadow-md ring-1 ring-gray-700 xl:h-28 xl:flex-row">
-        {title.backdropPath && (
-          <div className="absolute inset-0 z-0 w-full bg-cover bg-center xl:w-2/3">
-            <CachedImage
-              type={requestData.type === 'book' ? 'hardcover' : 'tmdb'}
-              src={
-                requestData.type === 'book'
-                  ? title.backdropPath
-                  : `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`
-              }
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              fill
-            />
+        {(isBook(title)
+          ? !title.posterPath.includes('/static/covers/')
+          : !!title.backdropPath) && (
+          <div className="absolute inset-0 z-0 w-full overflow-hidden bg-cover bg-center xl:w-2/3">
+            {isBook(title) ? (
+              <CachedImage
+                type="hardcover"
+                src={title.posterPath}
+                alt=""
+                className="scale-125 blur-2xl"
+                style={{ objectFit: 'cover' }}
+                fill
+              />
+            ) : (
+              <CachedImage
+                type="tmdb"
+                src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                fill
+              />
+            )}
             <div
               className="absolute inset-0"
               style={{

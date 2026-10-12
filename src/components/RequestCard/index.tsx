@@ -377,15 +377,28 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
         data-testid="request-card"
       >
-        {title.backdropPath && (
-          <div className="absolute inset-0 z-0">
-            <CachedImage
-              type={request.type === 'book' ? 'hardcover' : 'tmdb'}
-              alt=""
-              src={title.backdropPath}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              fill
-            />
+        {(isBook(title)
+          ? !title.posterPath.includes('/static/covers/')
+          : !!title.backdropPath) && (
+          <div className="absolute inset-0 z-0 overflow-hidden">
+            {isBook(title) ? (
+              <CachedImage
+                type="hardcover"
+                src={title.posterPath}
+                alt=""
+                className="scale-125 blur-2xl"
+                style={{ objectFit: 'cover' }}
+                fill
+              />
+            ) : (
+              <CachedImage
+                type="tmdb"
+                alt=""
+                src={title.backdropPath ?? ''}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                fill
+              />
+            )}
             <div
               className="absolute inset-0"
               style={{
