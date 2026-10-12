@@ -3,7 +3,6 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
-import CoverTiles from '@app/components/Common/CoverTiles';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
@@ -461,7 +460,13 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
           : !!title.backdropPath) && (
           <div className="absolute inset-0 z-0 w-full overflow-hidden bg-cover bg-center xl:w-2/3">
             {isBook(title) ? (
-              <CoverTiles cover={title.posterPath} />
+              <CachedImage
+                type="hardcover"
+                src={title.posterPath}
+                alt=""
+                style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
+                fill
+              />
             ) : (
               <CachedImage
                 type="tmdb"
