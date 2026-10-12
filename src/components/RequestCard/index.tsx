@@ -401,7 +401,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               request.type === 'movie'
                 ? `/movie/${requestData.media.tmdbId}`
                 : request.type === 'book'
-                  ? `book/${requestData.media.tmdbId}`
+                  ? `/book/${requestData.media.tmdbId}`
                   : `/tv/${requestData.media.tmdbId}`
             }
             className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-white hover:underline sm:text-lg"
@@ -651,7 +651,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             request.type === 'movie'
               ? `/movie/${requestData.media.tmdbId}`
               : request.type === 'book'
-                ? `book/${requestData.media.tmdbId}`
+                ? `/book/${requestData.media.tmdbId}`
                 : `/tv/${requestData.media.tmdbId}`
           }
           className="w-20 flex-shrink-0 scale-100 transform-gpu cursor-pointer overflow-hidden rounded-md shadow-sm transition duration-300 hover:scale-105 hover:shadow-md sm:w-28"
