@@ -3,13 +3,19 @@ import logger from '@server/logger';
 import { Router } from 'express';
 import sharp from 'sharp';
 
-const hardcoverTransform = async (buffer: Buffer) => ({
-  buffer: await sharp(buffer)
-    .resize(600, 900, { fit: 'cover' })
-    .webp({ quality: 80 })
-    .toBuffer(),
-  extension: 'webp',
-});
+const hardcoverTransform = async (buffer: Buffer) => {
+  const image = sharp(buffer);
+  const { width = 0, height = 0 } = await image.metadata();
+
+  return {
+    buffer: await (
+      width > height ? image : image.resize(600, 900, { fit: 'cover' })
+    )
+      .webp({ quality: 80 })
+      .toBuffer(),
+    extension: 'webp',
+  };
+};
 
 const router = Router();
 
