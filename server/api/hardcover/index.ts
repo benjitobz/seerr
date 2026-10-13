@@ -52,18 +52,34 @@ interface SearchOptions {
   page?: number;
 }
 
-export const getHeader = (tags: Tags): string | null => {
-  if (!tags.Genre?.length) {
-    return null;
-  }
+const HEADER_ALIASES: Record<string, string> = {
+  dystopia: 'dystopian',
+  'literary-fiction': 'fiction',
+  literary: 'fiction',
+  'historical-fiction': 'history',
+  thriller: 'mystery',
+  crime: 'mystery',
+  suspense: 'mystery',
+  biography: 'nonfiction',
+  memoir: 'nonfiction',
+  'young-adult-fiction': 'young-adult',
+};
 
-  for (const genre of tags.Genre) {
-    if (genre.tagSlug && VALID_BOOK_HEADERS.includes(genre.tagSlug)) {
-      return genre.tagSlug;
-    }
-  }
+const DEFAULT_BOOK_HEADER = 'bookstore';
 
-  return null;
+const UUID_SUFFIX =
+  /-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export const getHeader = (tags: Tags): string => {
+  const slugs = (tags?.Genre ?? [])
+    .map((genre) => genre.tagSlug?.replace(UUID_SUFFIX, ''))
+    .filter((slug): slug is string => !!slug);
+
+  return (
+    slugs.find((slug) => VALID_BOOK_HEADERS.includes(slug)) ??
+    slugs.map((slug) => HEADER_ALIASES[slug]).find((slug) => slug) ??
+    DEFAULT_BOOK_HEADER
+  );
 };
 
 const RATE_LIMIT_RETRIES = 2;

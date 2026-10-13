@@ -3,7 +3,6 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
-import CoverRow from '@app/components/Common/CoverRow';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
 import useDeepLinks from '@app/hooks/useDeepLinks';
@@ -15,7 +14,6 @@ import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
 } from '@app/utils/refreshIntervalHelper';
-import getSeriesCovers from '@app/utils/seriesCovers';
 import {
   ArrowPathIcon,
   CheckIcon,
@@ -29,7 +27,6 @@ import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { RequestResultsResponse } from '@server/interfaces/api/requestInterfaces';
 import type { BookDetails } from '@server/models/Book';
 import type { MovieDetails } from '@server/models/Movie';
-import type { Series } from '@server/models/Series';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import Link from 'next/link';
@@ -333,12 +330,6 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
   const { data: title, error } = useSWR<MovieDetails | TvDetails | BookDetails>(
     inView ? url : null
   );
-  const { data: series } = useSWR<Series>(
-    title && isBook(title) && title.series?.[0]
-      ? `/api/v1/series/${title.series[0].series_id}`
-      : null
-  );
-  const seriesCovers = getSeriesCovers(series);
   const { data: requestData, mutate: revalidate } = useSWR<
     NonFunctionProperties<MediaRequest>
   >(`/api/v1/request/${request.id}`, {
@@ -464,31 +455,19 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
         }}
       />
       <div className="relative flex w-full flex-col justify-between overflow-hidden rounded-xl bg-gray-800 py-2 text-gray-400 shadow-md ring-1 ring-gray-700 xl:h-28 xl:flex-row">
-        {(isBook(title)
-          ? !title.posterPath.includes('/static/covers/')
-          : !!title.backdropPath) && (
-          <div className="absolute inset-0 z-0 w-full overflow-hidden bg-cover bg-center xl:w-2/3">
-            {isBook(title) ? (
-              seriesCovers.length >= 3 ? (
-                <CoverRow covers={seriesCovers} />
-              ) : (
-                <CachedImage
-                  type="hardcover"
-                  src={title.posterPath}
-                  alt=""
-                  style={{ objectFit: 'cover', objectPosition: 'center 35%' }}
-                  fill
-                />
-              )
-            ) : (
-              <CachedImage
-                type="tmdb"
-                src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                fill
-              />
-            )}
+        {title.backdropPath && (
+          <div className="absolute inset-0 z-0 w-full bg-cover bg-center xl:w-2/3">
+            <CachedImage
+              type={requestData.type === 'book' ? 'hardcover' : 'tmdb'}
+              src={
+                requestData.type === 'book'
+                  ? title.backdropPath
+                  : `https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${title.backdropPath}`
+              }
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              fill
+            />
             <div
               className="absolute inset-0"
               style={{
