@@ -6,6 +6,7 @@ import { mutate } from 'swr';
 export interface BookFormatRequestOutcome {
   is4k: boolean;
   request?: MediaRequest;
+  error?: string;
 }
 
 export const requestBookFormats = async (
@@ -37,5 +38,9 @@ export const requestBookFormats = async (
   return results.map((result, index) => ({
     is4k: formats[index],
     request: result.status === 'fulfilled' ? result.value.data : undefined,
+    error:
+      result.status === 'rejected'
+        ? result.reason?.response?.data?.message
+        : undefined,
   }));
 };

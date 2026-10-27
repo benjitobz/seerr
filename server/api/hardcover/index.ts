@@ -12,12 +12,14 @@ import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import type {
   AuthorByPKResponse,
+  AuthorSeriesResponse,
   BookByPKResponse,
   BookResponse,
-  Books,
   BookTrendingResponse,
+  Books,
   HardcoverAuthorDetails,
   HardcoverAuthorResult,
+  HardcoverAuthorSeries,
   HardcoverBookDetails,
   HardcoverBookResult,
   HardcoverSearchHit,
@@ -456,6 +458,32 @@ class Hardcover extends ExternalAPI {
       return data.data.books_by_pk;
     } catch (e) {
       throw new Error(`[HARDCOVER] Failed to fetch book details: ${e.message}`);
+    }
+  };
+
+  public getAuthorSeries = async (
+    authorId: number
+  ): Promise<HardcoverAuthorSeries[]> => {
+    try {
+      const data = await this.post<AuthorSeriesResponse>('/', {
+        query: `
+          query AuthorSeries($authorId: Int!) {
+            series(where: {author_id: {_eq: $authorId}}, order_by: {primary_books_count: desc}) {
+              id
+              name
+              primary_books_count
+            }
+          }
+        `,
+        variables: {
+          authorId,
+        },
+      });
+      return data.data.series;
+    } catch (e) {
+      throw new Error(
+        `[HARDCOVER] Failed to fetch author series: ${e.message}`
+      );
     }
   };
 

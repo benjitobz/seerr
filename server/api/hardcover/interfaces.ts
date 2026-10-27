@@ -250,6 +250,18 @@ interface BookSeries {
   book: HardcoverBookResult;
 }
 
+export interface HardcoverAuthorSeries {
+  id: number;
+  name: string;
+  primary_books_count: number | null;
+}
+
+export interface AuthorSeriesResponse {
+  data: {
+    series: HardcoverAuthorSeries[];
+  };
+}
+
 export interface HardcoverSeries {
   id: number;
   name: string;
