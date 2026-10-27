@@ -643,6 +643,7 @@
   "components.RequestModal.approve": "Approve Request",
   "components.RequestModal.audiobook": "Audiobook",
   "components.RequestModal.autoapproval": "Automatic Approval",
+  "components.RequestModal.bookSetRequested": "<strong>{title}</strong> is a set, so its books were requested individually.",
   "components.RequestModal.cancel": "Cancel Request",
   "components.RequestModal.ebook": "Ebook",
   "components.RequestModal.edit": "Edit Request",

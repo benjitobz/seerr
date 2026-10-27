@@ -7,6 +7,7 @@ import {
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces';
+import { parseBookSet, resolveBookSetMembers } from '@server/lib/bookSets';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import overrideRules from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
@@ -42,9 +43,11 @@ export class QuotaRestrictedError extends Error {}
 export class DuplicateMediaRequestError extends Error {}
 export class NoSeasonsAvailableError extends Error {}
 export class BlocklistedMediaError extends Error {}
+export class BookSetError extends Error {}
 
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
+  fromBookSet?: boolean;
 };
 
 @Entity()
@@ -56,6 +59,24 @@ export class MediaRequest {
   ): Promise<MediaRequest> {
     // is4k is optional, and an undefined one binds as null in the duplicate query
     const body = { ...requestBody, is4k: !!requestBody.is4k };
+
+    if (body.mediaType === MediaType.BOOK && !options.fromBookSet) {
+      const hardcover = new Hardcover();
+      const book = await hardcover.getBook(body.mediaId);
+      const range = parseBookSet(book.title);
+
+      if (range) {
+        const members = await resolveBookSetMembers(hardcover, book, range);
+
+        if (!members.length) {
+          throw new BookSetError(
+            `${book.title} is a set of books that could not be matched to a series. Request the books individually.`
+          );
+        }
+
+        return MediaRequest.requestBookSet(members, body, user, options);
+      }
+    }
 
     // Only a caller allowed to set the request user may queue on their lock
     const lockUserId =
@@ -71,6 +92,48 @@ export class MediaRequest {
         MediaRequest.createRequest(body, user, options)
       )
     );
+  }
+
+  private static async requestBookSet(
+    members: number[],
+    body: MediaRequestBody,
+    user: User,
+    options: MediaRequestOptions
+  ): Promise<MediaRequest> {
+    let created: MediaRequest | undefined;
+    let duplicate: DuplicateMediaRequestError | undefined;
+
+    for (const mediaId of members) {
+      try {
+        const request = await MediaRequest.request({ ...body, mediaId }, user, {
+          ...options,
+          fromBookSet: true,
+        });
+        created = created ?? request;
+      } catch (e) {
+        if (e instanceof DuplicateMediaRequestError) {
+          duplicate = e;
+          continue;
+        }
+        throw e;
+      }
+    }
+
+    if (!created) {
+      throw (
+        duplicate ??
+        new BookSetError('No books in this set could be requested.')
+      );
+    }
+
+    logger.info('Requested the books of a set individually', {
+      label: 'Media Request',
+      setId: body.mediaId,
+      members,
+      is4k: body.is4k,
+    });
+
+    return created;
   }
 
   private static async createRequest(
