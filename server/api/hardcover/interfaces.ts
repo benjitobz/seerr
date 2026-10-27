@@ -51,6 +51,7 @@ export interface Series {
 export interface HardcoverBookResult {
   id: number;
   title: string;
+  users_count?: number;
   description: string;
   release_date: string;
   cached_tags?: Tags;

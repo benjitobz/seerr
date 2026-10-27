@@ -6,6 +6,7 @@ import {
   SERIES,
   VALID_BOOK_HEADERS,
 } from '@server/api/hardcover/constants';
+import { parseBookSet } from '@server/lib/bookSets';
 import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
 import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
@@ -122,6 +123,34 @@ export const retryOnRateLimit = (instance: AxiosInstance): void => {
 // Routes create a client per request, so the limiter has to be shared to keep
 // the server inside Hardcover's 60 requests a minute.
 let sharedClient: { token: string; axios: AxiosInstance } | undefined;
+
+// Hardcover lists translations and box sets alongside a series' books, often
+// at the same position, and flags the wrong entries as compilations
+export const pickSeriesBooks = (
+  rows: HardcoverSeries['book_series']
+): HardcoverSeries['book_series'] => {
+  const best = new Map<number, HardcoverSeries['book_series'][number]>();
+
+  for (const row of rows) {
+    if (parseBookSet(row.book.title)) {
+      continue;
+    }
+
+    const position = Number(row.position);
+    const current = best.get(position);
+
+    if (
+      !current ||
+      (row.book.users_count ?? 0) > (current.book.users_count ?? 0)
+    ) {
+      best.set(position, row);
+    }
+  }
+
+  return [...best.values()].sort(
+    (a, b) => Number(a.position) - Number(b.position)
+  );
+};
 
 class Hardcover extends ExternalAPI {
   constructor() {
@@ -500,13 +529,13 @@ class Hardcover extends ExternalAPI {
               books_count
               book_series(
                 order_by: [{position: asc}, {book: {users_count: desc}}]
-                distinct_on: position
-                where: {book: {book_status_id: {_eq: "1"}, compilation: {_eq: false}, release_date: {_is_null: false}}, position: {_gt: "0"}}
+                where: {book: {book_status_id: {_eq: "1"}, release_date: {_is_null: false}}, position: {_gt: "0"}}
               ) {
                 series_id
                 position
                 book {
                   ${BOOK_RESULT}
+                  users_count
                 }
               }
             }
@@ -517,7 +546,12 @@ class Hardcover extends ExternalAPI {
         },
       });
 
-      return data.data.series_by_pk;
+      const series = data.data.series_by_pk;
+
+      return {
+        ...series,
+        book_series: pickSeriesBooks(series.book_series),
+      };
     } catch (e) {
       throw new Error(`[HARDCOVER] Failed to fetch book details: ${e.message}`);
     }
