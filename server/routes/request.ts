@@ -10,6 +10,7 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
   BlocklistedMediaError,
+  BookSetError,
   DuplicateMediaRequestError,
   MediaRequest,
   NoSeasonsAvailableError,
@@ -389,6 +390,8 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
           return next({ status: 202, message: error.message });
         case BlocklistedMediaError:
           return next({ status: 403, message: error.message });
+        case BookSetError:
+          return next({ status: 400, message: error.message });
         default:
           return next({ status: 500, message: error.message });
       }

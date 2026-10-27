@@ -29,6 +29,8 @@ import useSWR, { mutate } from 'swr';
 const messages = defineMessages('components.RequestModal', {
   requestadmin: 'This request will be approved automatically.',
   requestSuccess: '<strong>{title}</strong> requested successfully!',
+  bookSetRequested:
+    '<strong>{title}</strong> is a set, so its books were requested individually.',
   requestCancel: 'Request for <strong>{title}</strong> canceled.',
   requestbooktitle: 'Request Book',
   requestebook: 'Request Ebook',
@@ -183,8 +185,17 @@ const BookRequestModal = ({
       const requested = outcomes.filter((outcome) => outcome.request);
 
       if (!requested.length) {
-        throw new Error('No book format request succeeded');
+        const reason = outcomes.find((outcome) => outcome.error)?.error;
+        addToast(reason ?? intl.formatMessage(messages.requesterror), {
+          appearance: 'error',
+          autoDismiss: true,
+        });
+        return;
       }
+
+      const isSet = requested.some(
+        (outcome) => outcome.request?.media?.tmdbId !== data.id
+      );
 
       // The request response carries the media row as it was created, which is
       // always pending; the approved-to-processing flip happens after it returns
@@ -196,14 +207,20 @@ const BookRequestModal = ({
           : formatStatus(is4k);
 
       if (onComplete) {
-        onComplete(statusAfter(false), statusAfter(true));
+        onComplete(
+          isSet ? formatStatus(false) : statusAfter(false),
+          isSet ? formatStatus(true) : statusAfter(true)
+        );
       }
       addToast(
         <span>
-          {intl.formatMessage(messages.requestSuccess, {
-            title: data.title,
-            strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
-          })}
+          {intl.formatMessage(
+            isSet ? messages.bookSetRequested : messages.requestSuccess,
+            {
+              title: data.title,
+              strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
+            }
+          )}
         </span>,
         { appearance: 'success', autoDismiss: true }
       );
